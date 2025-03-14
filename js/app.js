@@ -147,6 +147,30 @@ document.addEventListener("DOMContentLoaded", () => {
         setupCopySessionLink();
         setupDiceEvents(socket, sessionId, playerName, saveDiceToServer);
         setupEventListeners();
+        
+        // 初始化战场
+        initBattlefield();
+        
+        // 设置HP变化监听器
+        monsterContainer.addEventListener("input", (e) => {
+            const input = e.target;
+            if (input.classList.contains("current-hp-input") || input.classList.contains("max-hp-input") || input.classList.contains("temp-hp-input")) {
+                const card = input.closest(".monster-card");
+                if (card) {
+                    updateHpBar(card);
+                    
+                    // 同步到战场棋子
+                    const pieceId = card.dataset.id;
+                    const currentHp = card.querySelector(".current-hp-input").value;
+                    const maxHp = card.querySelector(".max-hp-input").value;
+                    if (window.updatePieceHp) {
+                        window.updatePieceHp(pieceId, currentHp, maxHp);
+                    }
+                    
+                    saveToServer();
+                }
+            }
+        });
     }
     function loadFromServer(isInitialLoad = false) {
         if (isLoadingData) return;
@@ -369,6 +393,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 setTimeout(() => manualSyncBtn.classList.remove("syncing"), 1000);
             }, 1000);
         });
+        
+        // 战场按钮事件监听器
+        const battlefieldBtn = document.getElementById("battlefield-btn");
+        battlefieldBtn.addEventListener("click", () => {
+            if (!isConnected) return alert("未连接到服务器，请检查网络连接并刷新页面");
+            openBattlefield();
+        });
+        
         closeStatusBtn.addEventListener("click", () => statusSelector.classList.remove("active"));
         cancelStatusBtn.addEventListener("click", () => statusSelector.classList.remove("active"));
         applyStatusBtn.addEventListener("click", applySelectedStatus);

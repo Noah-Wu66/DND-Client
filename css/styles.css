@@ -1750,3 +1750,307 @@ h1 {
         max-height: calc(95vh - 300px);
     }
 }
+
+/* 战场样式 */
+.battlefield-dialog {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    z-index: 1000;
+    overflow: hidden;
+}
+
+.battlefield-dialog.active {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.battlefield-panel {
+    position: relative;
+    width: 90%;
+    height: 90%;
+    background-color: #f5f5f5;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.battlefield-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 20px;
+    background-color: #333;
+    color: white;
+}
+
+.battlefield-title {
+    margin: 0;
+    font-size: 1.5rem;
+}
+
+.close-battlefield {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border-radius: 50%;
+    transition: background-color 0.2s;
+}
+
+.close-battlefield:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+.battlefield-controls {
+    padding: 10px;
+    background-color: #e0e0e0;
+    border-bottom: 1px solid #ccc;
+}
+
+.battlefield-tools {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.upload-btn {
+    display: inline-block;
+    padding: 8px 12px;
+    background-color: #4CAF50;
+    color: white;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background-color 0.2s;
+}
+
+.upload-btn:hover {
+    background-color: #45a049;
+}
+
+.zoom-btn {
+    padding: 8px 12px;
+    background-color: #2196F3;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background-color 0.2s;
+}
+
+.zoom-btn:hover {
+    background-color: #0b7dda;
+}
+
+.battlefield-container {
+    flex: 1;
+    position: relative;
+    overflow: auto;
+    background-color: #ddd;
+}
+
+.battlefield-grid {
+    position: relative;
+    width: 2000px;
+    height: 2000px;
+    background-color: rgba(255, 255, 255, 0.8);
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    transform-origin: 0 0;
+    transition: transform 0.1s ease-out;
+}
+
+.battlefield-grid::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image: 
+        linear-gradient(to right, rgba(0, 0, 0, 0.1) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(0, 0, 0, 0.1) 1px, transparent 1px);
+    background-size: 50px 50px;
+    pointer-events: none;
+}
+
+.battlefield-piece {
+    position: absolute;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    cursor: grab;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+    z-index: 10;
+    user-select: none;
+    transition: transform 0.1s ease-out;
+    overflow: visible;
+}
+
+.battlefield-piece.dragging {
+    cursor: grabbing;
+    z-index: 20;
+    transform: scale(1.1);
+}
+
+.piece-name {
+    position: absolute;
+    top: -20px;
+    left: 50%;
+    transform: translateX(-50%);
+    white-space: nowrap;
+    font-size: 12px;
+    background-color: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 2px 5px;
+    border-radius: 3px;
+    pointer-events: none;
+}
+
+.piece-hp {
+    position: absolute;
+    bottom: -20px;
+    left: 50%;
+    transform: translateX(-50%);
+    white-space: nowrap;
+    font-size: 12px;
+    background-color: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 2px 5px;
+    border-radius: 3px;
+    pointer-events: none;
+}
+
+/* 响应式样式 */
+@media (max-width: 768px) {
+    .battlefield-panel {
+        width: 100%;
+        height: 100%;
+        border-radius: 0;
+    }
+    
+    .battlefield-tools {
+        justify-content: center;
+    }
+    
+    .battlefield-piece {
+        width: 30px;
+        height: 30px;
+    }
+    
+    .piece-name, .piece-hp {
+        font-size: 10px;
+    }
+}
+
+/* 触摸设备优化 */
+@media (pointer: coarse) {
+    .battlefield-piece {
+        width: 44px;
+        height: 44px;
+    }
+    
+    .zoom-btn, .upload-btn {
+        padding: 10px 15px;
+        font-size: 1rem;
+    }
+    
+    .battlefield-grid::before {
+        background-size: 60px 60px;
+    }
+}
+
+.toggle-btn {
+    padding: 8px 12px;
+    background-color: #FF9800;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background-color 0.2s;
+}
+
+.toggle-btn:hover {
+    background-color: #F57C00;
+}
+
+.toggle-btn.active {
+    background-color: #607D8B;
+}
+
+.piece-size-control {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background-color: #f0f0f0;
+    padding: 5px 10px;
+    border-radius: 4px;
+}
+
+.piece-size-control span {
+    font-size: 0.9rem;
+}
+
+.size-btn {
+    width: 24px;
+    height: 24px;
+    background-color: #2196F3;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold;
+    transition: background-color 0.2s;
+}
+
+.size-btn:hover {
+    background-color: #0b7dda;
+}
+
+#piece-size-value {
+    min-width: 50px;
+    text-align: center;
+    font-weight: bold;
+}
+
+.battlefield-grid.hide-grid::before {
+    display: none;
+}
+
+/* 响应式样式 */
+@media (max-width: 768px) {
+    .piece-size-control {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    
+    .toggle-btn, .size-btn {
+        padding: 10px 15px;
+        font-size: 1rem;
+    }
+}
