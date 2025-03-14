@@ -772,14 +772,28 @@ function loadBattlefieldStateFromServer() {
             .then(result => {
                 console.log('API返回结果:', result);
                 if (result.success && result.data) {
-                    console.log("成功加载战场数据:", result.data);
-                    battlefieldState = result.data;
+                    // 转换服务器返回的数据结构为本地使用的格式
+                    const serverState = result.data;
+                    battlefieldState = {
+                        pieces: serverState.pieces || {},
+                        isGridVisible: serverState.settings?.gridVisible ?? true,
+                        pieceSize: serverState.settings?.pieceSize ?? 40,
+                        backgroundImage: serverState.background || null
+                    };
+                    
+                    console.log("转换后的战场状态:", battlefieldState);
+                    
                     // 确保在应用状态前刷新战场
                     refreshBattlefield();
                     applyBattlefieldState();
                 } else {
                     console.log("没有找到战场数据或数据为空");
-                    battlefieldState = {};
+                    battlefieldState = {
+                        pieces: {},
+                        isGridVisible: true,
+                        pieceSize: 40,
+                        backgroundImage: null
+                    };
                 }
             })
             .catch(error => {
@@ -790,7 +804,12 @@ function loadBattlefieldStateFromServer() {
                     setTimeout(attemptLoad, 1000 * retryCount);
                 } else {
                     console.error("达到最大重试次数，加载失败");
-                    battlefieldState = {};
+                    battlefieldState = {
+                        pieces: {},
+                        isGridVisible: true,
+                        pieceSize: 40,
+                        backgroundImage: null
+                    };
                 }
             });
     }
@@ -805,12 +824,25 @@ function saveBattlefieldStateToServer() {
         return;
     }
     
-    console.log('开始保存战场状态:', battlefieldState);
+    // 转换数据结构为服务器期望的格式
+    const stateToSave = {
+        sessionId: window.sessionId,
+        pieces: battlefieldState.pieces || {},
+        settings: {
+            gridVisible: battlefieldState.isGridVisible !== undefined ? battlefieldState.isGridVisible : true,
+            pieceSize: battlefieldState.pieceSize || 40,
+            scale: battlefieldState.scale || 1
+        },
+        background: battlefieldState.backgroundImage || null,
+        lastUpdated: new Date().toISOString()
+    };
+    
+    console.log('开始保存战场状态:', stateToSave);
     
     // 通过Socket.io发送战场状态
     window.socket.emit('update-battlefield-state', {
         sessionId: window.sessionId,
-        state: battlefieldState
+        state: stateToSave
     });
     
     // 使用API保存战场状态
@@ -826,7 +858,7 @@ function saveBattlefieldStateToServer() {
         fetch(`${BATTLEFIELD_API_URL}/sessions/${window.sessionId}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(battlefieldState)
+            body: JSON.stringify(stateToSave)
         })
             .then(response => {
                 if (!response.ok) {
