@@ -109,10 +109,25 @@ function setupBattlefieldEventListeners() {
 
 // 设置Socket.io事件
 function setupBattlefieldSocketEvents() {
-    if (!window.socket) return;
+    if (!window.socket) {
+        console.error('Socket.io 未初始化');
+        return;
+    }
+    
+    // 监听连接状态
+    window.socket.on('connect', () => {
+        console.log('Socket.io 已连接');
+        // 连接后立即请求最新状态
+        loadBattlefieldStateFromServer();
+    });
+    
+    window.socket.on('disconnect', () => {
+        console.log('Socket.io 已断开连接');
+    });
     
     // 监听棋子移动事件
     window.socket.on('piece-moved', (data) => {
+        console.log('收到棋子移动事件:', data);
         if (data && data.pieceId && data.x !== undefined && data.y !== undefined) {
             updatePiecePosition(data.pieceId, data.x, data.y, false);
         }
@@ -120,6 +135,7 @@ function setupBattlefieldSocketEvents() {
     
     // 监听背景图片更新事件
     window.socket.on('background-updated', (data) => {
+        console.log('收到背景更新事件:', data);
         if (data && data.imageUrl) {
             updateBackgroundImage(data.imageUrl, false);
         }
@@ -127,31 +143,28 @@ function setupBattlefieldSocketEvents() {
     
     // 监听分块图片传输完成事件
     window.socket.on('background-transfer-complete', (data) => {
+        console.log('收到背景传输完成事件:', data);
         if (data && data.imageUrl) {
-            console.log('接收到完整的背景图片');
             updateBackgroundImage(data.imageUrl, false);
-        }
-    });
-    
-    // 监听缩放更新事件
-    window.socket.on('scale-updated', (data) => {
-        if (data && data.scale !== undefined) {
-            updateBattlefieldScale(data.scale, false);
         }
     });
     
     // 监听方格显示/隐藏事件
     window.socket.on('grid-visibility-updated', (data) => {
+        console.log('收到方格显示更新事件:', data);
         if (data && data.isVisible !== undefined) {
             updateGridVisibility(data.isVisible, false);
             const toggleGridBtn = document.getElementById('toggle-grid');
-            toggleGridBtn.textContent = data.isVisible ? '隐藏方格' : '显示方格';
-            toggleGridBtn.classList.toggle('active', !data.isVisible);
+            if (toggleGridBtn) {
+                toggleGridBtn.textContent = data.isVisible ? '隐藏方格' : '显示方格';
+                toggleGridBtn.classList.toggle('active', !data.isVisible);
+            }
         }
     });
     
     // 监听棋子大小更新事件
     window.socket.on('piece-size-updated', (data) => {
+        console.log('收到棋子大小更新事件:', data);
         if (data && data.size !== undefined) {
             updatePieceSize(data.size, false);
         }
@@ -159,6 +172,7 @@ function setupBattlefieldSocketEvents() {
     
     // 监听战场状态更新事件
     window.socket.on('battlefield-state-updated', (data) => {
+        console.log('收到战场状态更新事件:', data);
         if (data && data.state) {
             loadBattlefieldState(data.state);
         }
@@ -275,7 +289,7 @@ function updatePiecePosition(pieceId, x, y, emitEvent = true) {
         });
         
         // 延迟保存状态，避免频繁保存
-        debounce(saveBattlefieldStateToServer, 1000)();
+        debouncedSaveState();
     }
 }
 
@@ -311,7 +325,7 @@ function updateGridVisibility(isVisible, emitEvent = true) {
         });
         
         // 延迟保存状态
-        debounce(saveBattlefieldStateToServer, 1000)();
+        debouncedSaveState();
     }
 }
 
@@ -344,7 +358,7 @@ function updatePieceSize(size, emitEvent = true) {
         });
         
         // 延迟保存状态
-        debounce(saveBattlefieldStateToServer, 1000)();
+        debouncedSaveState();
     }
 }
 
@@ -467,7 +481,7 @@ function updateBackgroundImage(imageUrl, emitEvent = true) {
             }
             
             // 延迟保存状态
-            debounce(saveBattlefieldStateToServer, 1000)();
+            debouncedSaveState();
         }
     };
     img.src = imageUrl;
@@ -711,7 +725,10 @@ function applyBattlefieldState() {
 
 // 从服务器加载战场状态
 function loadBattlefieldStateFromServer() {
-    if (!window.socket || !window.sessionId) return;
+    if (!window.socket || !window.sessionId) {
+        console.error('无法加载战场状态：Socket.io 或 sessionId 未初始化');
+        return;
+    }
     
     // 请求最新的战场状态
     window.socket.emit('get-battlefield-state', {
@@ -722,31 +739,50 @@ function loadBattlefieldStateFromServer() {
     const API_BASE_URL = 'https://dnd-database.zeabur.app/api/v1';
     const BATTLEFIELD_API_URL = `${API_BASE_URL}/battlefield`;
     
-    fetch(`${BATTLEFIELD_API_URL}/sessions/${window.sessionId}`)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP错误! 状态: ${response.status}`);
-            }
-            return response.json();
-        })
-        .then(result => {
-            if (result.success && result.data) {
-                console.log("加载到战场数据:", result.data);
-                battlefieldState = result.data;
-            } else {
-                console.log("没有找到战场数据或数据为空");
-                battlefieldState = {};
-            }
-        })
-        .catch(error => {
-            console.error("加载战场数据出错:", error);
-            battlefieldState = {};
-        });
+    // 添加重试机制
+    let retryCount = 0;
+    const maxRetries = 3;
+    
+    function attemptLoad() {
+        fetch(`${BATTLEFIELD_API_URL}/sessions/${window.sessionId}`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP错误! 状态: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(result => {
+                if (result.success && result.data) {
+                    console.log("成功加载战场数据:", result.data);
+                    battlefieldState = result.data;
+                    applyBattlefieldState();
+                } else {
+                    console.log("没有找到战场数据或数据为空");
+                    battlefieldState = {};
+                }
+            })
+            .catch(error => {
+                console.error("加载战场数据出错:", error);
+                if (retryCount < maxRetries) {
+                    retryCount++;
+                    console.log(`尝试重新加载 (${retryCount}/${maxRetries})...`);
+                    setTimeout(attemptLoad, 1000 * retryCount);
+                } else {
+                    console.error("达到最大重试次数，加载失败");
+                    battlefieldState = {};
+                }
+            });
+    }
+    
+    attemptLoad();
 }
 
 // 保存战场状态到服务器
 function saveBattlefieldStateToServer() {
-    if (!window.socket || !window.sessionId || Object.keys(battlefieldState).length === 0) return;
+    if (!window.socket || !window.sessionId || Object.keys(battlefieldState).length === 0) {
+        console.error('无法保存战场状态：Socket.io、sessionId 或状态为空');
+        return;
+    }
     
     // 通过Socket.io发送战场状态
     window.socket.emit('update-battlefield-state', {
@@ -758,27 +794,42 @@ function saveBattlefieldStateToServer() {
     const API_BASE_URL = 'https://dnd-database.zeabur.app/api/v1';
     const BATTLEFIELD_API_URL = `${API_BASE_URL}/battlefield`;
     
-    fetch(`${BATTLEFIELD_API_URL}/sessions/${window.sessionId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(battlefieldState)
-    })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP错误! 状态: ${response.status}`);
-            }
-            return response.json();
+    // 添加重试机制
+    let retryCount = 0;
+    const maxRetries = 3;
+    
+    function attemptSave() {
+        fetch(`${BATTLEFIELD_API_URL}/sessions/${window.sessionId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(battlefieldState)
         })
-        .then(result => {
-            if (result.success) {
-                console.log("战场数据保存成功");
-            } else {
-                console.error("战场保存失败:", result.error);
-            }
-        })
-        .catch(error => {
-            console.error("保存战场数据出错:", error);
-        });
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP错误! 状态: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(result => {
+                if (result.success) {
+                    console.log("战场数据保存成功");
+                } else {
+                    throw new Error(result.error || "保存失败");
+                }
+            })
+            .catch(error => {
+                console.error("保存战场数据出错:", error);
+                if (retryCount < maxRetries) {
+                    retryCount++;
+                    console.log(`尝试重新保存 (${retryCount}/${maxRetries})...`);
+                    setTimeout(attemptSave, 1000 * retryCount);
+                } else {
+                    console.error("达到最大重试次数，保存失败");
+                }
+            });
+    }
+    
+    attemptSave();
 }
 
 // 加载战场状态
@@ -792,18 +843,21 @@ function loadBattlefieldState(state) {
     applyBattlefieldState();
 }
 
-// 防抖函数，避免频繁调用
+// 防抖函数
 function debounce(func, wait) {
     let timeout;
-    return function() {
-        const context = this;
-        const args = arguments;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
         clearTimeout(timeout);
-        timeout = setTimeout(() => {
-            func.apply(context, args);
-        }, wait);
+        timeout = setTimeout(later, wait);
     };
 }
+
+// 创建防抖的保存状态函数
+const debouncedSaveState = debounce(saveBattlefieldStateToServer, 1000);
 
 // 导出函数
 window.openBattlefield = openBattlefield;
