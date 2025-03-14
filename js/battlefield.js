@@ -774,8 +774,15 @@ function loadBattlefieldStateFromServer() {
                 if (result.success && result.data) {
                     // 转换服务器返回的数据结构为本地使用的格式
                     const serverState = result.data;
+                    
+                    // 确保pieces是对象
+                    let pieces = serverState.pieces || {};
+                    if (Array.isArray(pieces)) {
+                        pieces = {};
+                    }
+                    
                     battlefieldState = {
-                        pieces: serverState.pieces || {},
+                        pieces: pieces,
                         isGridVisible: serverState.settings?.gridVisible ?? true,
                         pieceSize: serverState.settings?.pieceSize ?? 40,
                         backgroundImage: serverState.background || null
@@ -827,7 +834,7 @@ function saveBattlefieldStateToServer() {
     // 转换数据结构为服务器期望的格式
     const stateToSave = {
         sessionId: window.sessionId,
-        pieces: battlefieldState.pieces || {},
+        pieces: battlefieldState.pieces || {},  // 确保pieces是对象而不是数组
         settings: {
             gridVisible: battlefieldState.isGridVisible !== undefined ? battlefieldState.isGridVisible : true,
             pieceSize: battlefieldState.pieceSize || 40,
@@ -836,6 +843,11 @@ function saveBattlefieldStateToServer() {
         background: battlefieldState.backgroundImage || null,
         lastUpdated: new Date().toISOString()
     };
+    
+    // 确保pieces是对象
+    if (Array.isArray(stateToSave.pieces)) {
+        stateToSave.pieces = {};
+    }
     
     console.log('开始保存战场状态:', stateToSave);
     
@@ -893,8 +905,19 @@ function saveBattlefieldStateToServer() {
 function loadBattlefieldState(state) {
     if (!state) return;
     
+    // 确保pieces是对象
+    let pieces = state.pieces || {};
+    if (Array.isArray(pieces)) {
+        pieces = {};
+    }
+    
     // 更新本地状态
-    battlefieldState = state;
+    battlefieldState = {
+        pieces: pieces,
+        isGridVisible: state.settings?.gridVisible ?? true,
+        pieceSize: state.settings?.pieceSize ?? 40,
+        backgroundImage: state.background || null
+    };
     
     // 应用状态
     applyBattlefieldState();
