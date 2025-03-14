@@ -187,12 +187,14 @@ function openBattlefield() {
 
 // 刷新战场
 function refreshBattlefield() {
+    console.log('开始刷新战场');
     // 清空当前棋子
     battlefieldGrid.innerHTML = '';
     battlefieldPieces = {};
     
     // 获取所有冒险者和怪物卡片
     const monsterCards = document.querySelectorAll('.monster-card');
+    console.log('找到卡片数量:', monsterCards.length);
     
     // 为每个卡片创建对应的棋子
     monsterCards.forEach((card, index) => {
@@ -202,12 +204,13 @@ function refreshBattlefield() {
         const currentHp = card.querySelector('.current-hp-input').value;
         const maxHp = card.querySelector('.max-hp-input').value;
         
+        console.log(`创建棋子: ${name} (${id}), 类型: ${isAdventurer ? '冒险者' : '怪物'}`);
+        
         // 创建棋子
         createBattlefieldPiece(id, name, isAdventurer, currentHp, maxHp, index);
     });
     
-    // 应用保存的战场状态
-    applyBattlefieldState();
+    console.log('战场刷新完成');
 }
 
 // 创建战场棋子
@@ -690,15 +693,22 @@ function updatePieceHp(pieceId, currentHp, maxHp) {
 
 // 应用战场状态
 function applyBattlefieldState() {
-    if (Object.keys(battlefieldState).length === 0) return;
+    if (Object.keys(battlefieldState).length === 0) {
+        console.log('没有可应用的战场状态');
+        return;
+    }
+    
+    console.log('开始应用战场状态:', battlefieldState);
     
     // 应用背景图片
     if (battlefieldState.backgroundImage) {
+        console.log('应用背景图片');
         updateBackgroundImage(battlefieldState.backgroundImage, false);
     }
     
     // 应用方格显示/隐藏状态
     if (battlefieldState.isGridVisible !== undefined) {
+        console.log('应用方格显示状态:', battlefieldState.isGridVisible);
         updateGridVisibility(battlefieldState.isGridVisible, false);
         const toggleGridBtn = document.getElementById('toggle-grid');
         if (toggleGridBtn) {
@@ -709,18 +719,23 @@ function applyBattlefieldState() {
     
     // 应用棋子大小
     if (battlefieldState.pieceSize) {
+        console.log('应用棋子大小:', battlefieldState.pieceSize);
         updatePieceSize(battlefieldState.pieceSize, false);
     }
     
     // 应用棋子位置
     if (battlefieldState.pieces) {
+        console.log('应用棋子位置:', battlefieldState.pieces);
         Object.keys(battlefieldState.pieces).forEach(pieceId => {
             const pieceData = battlefieldState.pieces[pieceId];
             if (battlefieldPieces[pieceId] && pieceData.x !== undefined && pieceData.y !== undefined) {
+                console.log(`更新棋子 ${pieceId} 位置:`, pieceData);
                 updatePiecePosition(pieceId, pieceData.x, pieceData.y, false);
             }
         });
     }
+    
+    console.log('战场状态应用完成');
 }
 
 // 从服务器加载战场状态
@@ -729,6 +744,8 @@ function loadBattlefieldStateFromServer() {
         console.error('无法加载战场状态：Socket.io 或 sessionId 未初始化');
         return;
     }
+    
+    console.log('开始加载战场状态，sessionId:', window.sessionId);
     
     // 请求最新的战场状态
     window.socket.emit('get-battlefield-state', {
@@ -744,6 +761,7 @@ function loadBattlefieldStateFromServer() {
     const maxRetries = 3;
     
     function attemptLoad() {
+        console.log(`尝试加载战场状态 (第 ${retryCount + 1} 次)`);
         fetch(`${BATTLEFIELD_API_URL}/sessions/${window.sessionId}`)
             .then(response => {
                 if (!response.ok) {
@@ -752,9 +770,12 @@ function loadBattlefieldStateFromServer() {
                 return response.json();
             })
             .then(result => {
+                console.log('API返回结果:', result);
                 if (result.success && result.data) {
                     console.log("成功加载战场数据:", result.data);
                     battlefieldState = result.data;
+                    // 确保在应用状态前刷新战场
+                    refreshBattlefield();
                     applyBattlefieldState();
                 } else {
                     console.log("没有找到战场数据或数据为空");
@@ -784,6 +805,8 @@ function saveBattlefieldStateToServer() {
         return;
     }
     
+    console.log('开始保存战场状态:', battlefieldState);
+    
     // 通过Socket.io发送战场状态
     window.socket.emit('update-battlefield-state', {
         sessionId: window.sessionId,
@@ -799,6 +822,7 @@ function saveBattlefieldStateToServer() {
     const maxRetries = 3;
     
     function attemptSave() {
+        console.log(`尝试保存战场状态 (第 ${retryCount + 1} 次)`);
         fetch(`${BATTLEFIELD_API_URL}/sessions/${window.sessionId}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -811,6 +835,7 @@ function saveBattlefieldStateToServer() {
                 return response.json();
             })
             .then(result => {
+                console.log('保存结果:', result);
                 if (result.success) {
                     console.log("战场数据保存成功");
                 } else {
