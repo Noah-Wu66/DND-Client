@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>战斗助手与骰子模拟器</title>
+    <link rel="icon" href="favicon.png" type="image/png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+    <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>战斗助手</h1>
+        <div class="controls-panel">
+            <div class="monster-controls">
+                <button id="add-monster-btn">添加怪物</button>
+                <button id="add-adventurer-btn">添加冒险者</button>
+                <button id="reset-all-btn">重置所有</button>
+                <button id="manual-sync-btn" class="sync-button">
+                    <span class="sync-icon">↻</span> 手动同步
+                </button>
+                <button id="dice-btn">骰子模拟</button>
+                <button id="items-btn">物品查询</button>
+                <button id="spells-btn">法术查询</button>
+                <button id="battlefield-btn">查看战场</button>
+            </div>
+            <div class="setup-form">
+                <div class="form-group">
+                    <label for="monster-name-prefix">怪物名称前缀:</label>
+                    <input type="text" id="monster-name-prefix" class="form-input" value="怪物" style="width: 120px;">
+                </div>
+                <div class="form-group">
+                    <label for="adventurer-name-prefix">冒险者名称前缀:</label>
+                    <input type="text" id="adventurer-name-prefix" class="form-input" value="冒险者" style="width: 120px;">
+                </div>
+                <div class="form-group">
+                    <label for="default-hp">默认血量:</label>
+                    <input type="number" id="default-hp" class="form-input" value="100" min="1">
+                </div>
+            </div>
+        </div>
+        <div id="monster-container" class="monster-grid">
+            <div class="empty-state">点击上方按钮添加怪物或冒险者</div>
+        </div>
+    </div>
+    <div class="status-selector" id="status-selector">
+        <div class="status-panel">
+            <div class="status-header">
+                <h2 class="status-title">选择状态</h2>
+                <button class="close-status">×</button>
+            </div>
+            <div class="custom-status">
+                <div class="custom-status-title">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z" />
+                    </svg> 添加自定义状态
+                </div>
+                <div class="custom-status-inputs">
+                    <input type="text" class="custom-status-input" id="custom-status-name" placeholder="状态名称">
+                    <input type="text" class="custom-status-input" id="custom-status-desc" placeholder="状态描述">
+                    <button class="add-custom-btn" id="add-custom-status">添加</button>
+                </div>
+            </div>
+            <div class="conditions-grid"></div>
+            <div class="status-buttons">
+                <button class="cancel-status">取消</button>
+                <button class="apply-status">应用</button>
+            </div>
+        </div>
+    </div>
+    <div class="confirm-dialog" id="confirm-dialog">
+        <div class="confirm-box">
+            <div class="confirm-title">确认删除</div>
+            <div class="confirm-message" id="confirm-message">确定要删除此卡片吗？</div>
+            <div class="confirm-buttons">
+                <button class="confirm-cancel" id="confirm-cancel">取消</button>
+                <button class="confirm-delete" id="confirm-delete">删除</button>
+            </div>
+        </div>
+    </div>
+    <div class="dice-dialog" id="dice-dialog">
+        <div class="dice-panel">
+            <div class="dice-header">
+                <h2 class="dice-title">骰子模拟器</h2>
+                <button class="close-dice">×</button>
+            </div>
+            <div id="dice-container" class="dice-grid">
+                <div class="dice-card" data-dice="d4">
+                    <div class="dice-image">D4</div>
+                    <div class="quantity-controls">
+                        <button class="quantity-btn minus5">-5</button>
+                        <button class="quantity-btn minus">-</button>
+                        <span class="current-quantity">0</span>
+                        <button class="quantity-btn plus">+</button>
+                        <button class="quantity-btn plus5">+5</button>
+                    </div>
+                </div>
+                <div class="dice-card" data-dice="d6">
+                    <div class="dice-image">D6</div>
+                    <div class="quantity-controls">
+                        <button class="quantity-btn minus5">-5</button>
+                        <button class="quantity-btn minus">-</button>
+                        <span class="current-quantity">0</span>
+                        <button class="quantity-btn plus">+</button>
+                        <button class="quantity-btn plus5">+5</button>
+                    </div>
+                </div>
+                <div class="dice-card" data-dice="d8">
+                    <div class="dice-image">D8</div>
+                    <div class="quantity-controls">
+                        <button class="quantity-btn minus5">-5</button>
+                        <button class="quantity-btn minus">-</button>
+                        <span class="current-quantity">0</span>
+                        <button class="quantity-btn plus">+</button>
+                        <button class="quantity-btn plus5">+5</button>
+                    </div>
+                </div>
+                <div class="dice-card" data-dice="d10">
+                    <div class="dice-image">D10</div>
+                    <div class="quantity-controls">
+                        <button class="quantity-btn minus5">-5</button>
+                        <button class="quantity-btn minus">-</button>
+                        <span class="current-quantity">0</span>
+                        <button class="quantity-btn plus">+</button>
+                        <button class="quantity-btn plus5">+5</button>
+                    </div>
+                </div>
+                <div class="dice-card" data-dice="d12">
+                    <div class="dice-image">D12</div>
+                    <div class="quantity-controls">
+                        <button class="quantity-btn minus5">-5</button>
+                        <button class="quantity-btn minus">-</button>
+                        <span class="current-quantity">0</span>
+                        <button class="quantity-btn plus">+</button>
+                        <button class="quantity-btn plus5">+5</button>
+                    </div>
+                </div>
+                <div class="dice-card" data-dice="d20">
+                    <div class="dice-image">D20</div>
+                    <div class="quantity-controls">
+                        <button class="quantity-btn minus5">-5</button>
+                        <button class="quantity-btn minus">-</button>
+                        <span class="current-quantity">0</span>
+                        <button class="quantity-btn plus">+</button>
+                        <button class="quantity-btn plus5">+5</button>
+                    </div>
+                </div>
+            </div>
+            <div class="global-options">
+                <label><input type="checkbox" id="global-advantage" /> 优势</label>
+                <label><input type="checkbox" id="global-disadvantage" /> 劣势</label>
+            </div>
+            <div class="roll-controls">
+                <button id="roll-button">投掷骰子</button>
+                <button id="dice-reset-button">重置所有</button>
+            </div>
+            <div class="progress-bar-container">
+                <div class="progress-bar"></div>
+                <div class="progress-bar-text">随机数计算中</div>
+            </div>
+            <div id="dice-result" class="result-display"></div>
+        </div>
+    </div>
+    
+    <!-- 物品查询对话框 -->
+    <div class="items-dialog" id="items-dialog">
+        <div class="items-panel">
+            <div class="items-header">
+                <h2 class="items-title">D&D魔法物品查询</h2>
+                <button class="close-items">×</button>
+            </div>
+            <button id="collapse-filters-btn" class="collapse-button">
+                筛选与查找 <span class="arrow">▼</span>
+            </button>
+            <div id="filters-container" class="collapsible">
+                <div class="filters">
+                    <div class="filter-group">
+                        <label for="item-type">物品类型:</label>
+                        <select id="item-type">
+                            <option value="all">全部</option>
+                            <option value="武器">武器</option>
+                            <option value="护甲">护甲</option>
+                            <option value="药水">药水</option>
+                            <option value="卷轴">卷轴</option>
+                            <option value="魔杖">魔杖</option>
+                            <option value="法杖">法杖</option>
+                            <option value="奇物">奇物</option>
+                        </select>
+                        
+                        <label for="rarity">稀有度:</label>
+                        <select id="rarity">
+                            <option value="all">全部</option>
+                            <option value="普通">普通</option>
+                            <option value="非普通">非普通</option>
+                            <option value="珍稀">珍稀</option>
+                            <option value="非常珍稀">非常珍稀</option>
+                            <option value="传说">传说</option>
+                            <option value="神器">神器</option>
+                        </select>
+                        
+                        <label for="attunement">同调:</label>
+                        <select id="attunement">
+                            <option value="all">全部</option>
+                            <option value="需要">需要</option>
+                            <option value="不需要">不需要</option>
+                        </select>
+                    </div>
+                    
+                    <div class="search-box">
+                        <input type="text" id="search-input" placeholder="输入物品名称搜索...">
+                        <button id="search-button">搜索</button>
+                    </div>
+                    
+                    <div class="buttons">
+                        <button id="draw-1">抽取1个</button>
+                        <button id="draw-5">抽取5个</button>
+                        <button id="draw-10">抽取10个</button>
+                        <button id="draw-20">抽取20个</button>
+                        <button id="items-reset">重置</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="item-results" class="results">
+                <p>请选择筛选条件并点击抽取按钮，或使用搜索功能查找特定物品。</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 战场对话框 -->
+    <div class="battlefield-dialog" id="battlefield-dialog">
+        <div class="battlefield-panel">
+            <div class="battlefield-header">
+                <h2 class="battlefield-title">战场</h2>
+                <button class="close-battlefield">×</button>
+            </div>
+            <div class="battlefield-controls">
+                <div class="battlefield-tools">
+                    <label for="upload-background" class="upload-btn">
+                        上传背景图
+                        <input type="file" id="upload-background" accept="image/*" style="display: none;">
+                    </label>
+                    <button id="zoom-in" class="zoom-btn">放大</button>
+                    <button id="zoom-out" class="zoom-btn">缩小</button>
+                    <button id="reset-zoom" class="zoom-btn">重置缩放</button>
+                    <button id="toggle-grid" class="toggle-btn">隐藏方格</button>
+                    <div class="piece-size-control">
+                        <span>棋子大小:</span>
+                        <button id="decrease-piece-size" class="size-btn">-</button>
+                        <span id="piece-size-value">40px</span>
+                        <button id="increase-piece-size" class="size-btn">+</button>
+                    </div>
+                </div>
+            </div>
+            <div id="battlefield-container" class="battlefield-container">
+                <div id="battlefield-grid" class="battlefield-grid">
+                    <!-- 棋子将在这里动态生成 -->
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="sync-status">
+        <span class="sync-indicator"></span>
+        <span class="sync-text">已同步</span>
+    </div>
+    <script src="js/battle.js"></script>
+    <script src="js/conditions.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/dice.js"></script>
+    <script src="js/items.js"></script>
+    <script src="js/spells.js"></script>
+    <script src="js/battlefield.js"></script>
+    <script src="js/collapse.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
