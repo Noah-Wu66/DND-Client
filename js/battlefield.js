@@ -1,4 +1,3 @@
-// 战场功能实现
 let battlefield = null;
 let battlefieldContainer = null;
 let battlefieldGrid = null;
@@ -867,18 +866,19 @@ function saveBattlefieldStateToServer() {
         return;
     }
     
-    // 准备要发送的数据 - 转换为后端期望的格式
+    // 准备要发送的数据 - 确保结构简单明确
     const dataToSend = {
-        // 将pieces对象转换为数组格式
+        // 将pieces对象转换为有效的数组
         pieces: Object.entries(battlefieldState.pieces || {}).map(([id, piece]) => ({
             id: id,
-            ...piece,
-            name: piece.name || battlefieldPieces[id]?.name || "",
-            type: piece.type || (battlefieldPieces[id]?.isAdventurer ? "adventurer" : "monster"),
-            currentHp: piece.currentHp || battlefieldPieces[id]?.currentHp || 0,
-            maxHp: piece.maxHp || battlefieldPieces[id]?.maxHp || 0
+            x: piece.x || 0,
+            y: piece.y || 0,
+            name: battlefieldPieces[id]?.name || piece.name || "",
+            type: battlefieldPieces[id]?.isAdventurer ? "adventurer" : "monster",
+            currentHp: battlefieldPieces[id]?.currentHp || piece.currentHp || 0,
+            maxHp: battlefieldPieces[id]?.maxHp || piece.maxHp || 0
         })),
-        // 设置信息
+        // 简化设置信息
         settings: {
             scale: battlefieldScale,
             gridVisible: isGridVisible,
@@ -886,14 +886,14 @@ function saveBattlefieldStateToServer() {
         }
     };
     
-    // 如果有背景图，也包含它
+    // 如果有背景图，也包含它，但确保它是一个简单的字符串URL
     if (battlefieldState.backgroundImage) {
         dataToSend.background = {
             imageUrl: battlefieldState.backgroundImage
         };
     }
     
-    console.log("保存战场数据...");
+    console.log("保存战场数据，pieces数量:", dataToSend.pieces.length);
     
     // 通过Socket.io发送战场状态 - 使用转换后的格式
     window.socket.emit('update-battlefield-state', {
@@ -901,7 +901,7 @@ function saveBattlefieldStateToServer() {
         state: battlefieldState  // 客户端期望的原始格式
     });
     
-    // 使用API保存战场状态 - 使用后端期望的格式
+    // 使用API保存战场状态 - 使用更简化的格式
     const API_BASE_URL = 'https://dnd-database.zeabur.app/api/v1';
     const BATTLEFIELD_API_URL = `${API_BASE_URL}/battlefield`;
     
