@@ -111,9 +111,17 @@ function setupBattlefieldEventListeners() {
 function setupBattlefieldSocketEvents() {
     if (!window.socket) return;
     
+    // 首次连接时请求战场状态
+    setTimeout(() => {
+        if (window.socket && window.socket.connected) {
+            window.socket.emit('get-battlefield-state', { sessionId: window.sessionId });
+        }
+    }, 1000);
+    
     // 监听棋子移动事件
     window.socket.on('piece-moved', (data) => {
         if (data && data.pieceId && data.x !== undefined && data.y !== undefined) {
+            console.log(`收到棋子移动事件: ${data.pieceId} (${data.x}, ${data.y})`);
             updatePiecePosition(data.pieceId, data.x, data.y, false);
         }
     });
@@ -121,6 +129,7 @@ function setupBattlefieldSocketEvents() {
     // 监听背景图片更新事件
     window.socket.on('background-updated', (data) => {
         if (data && data.imageUrl) {
+            console.log('收到背景图片更新事件');
             updateBackgroundImage(data.imageUrl, false);
         }
     });
@@ -136,6 +145,7 @@ function setupBattlefieldSocketEvents() {
     // 监听缩放更新事件
     window.socket.on('scale-updated', (data) => {
         if (data && data.scale !== undefined) {
+            console.log(`收到缩放更新事件: ${data.scale}`);
             updateBattlefieldScale(data.scale, false);
         }
     });
@@ -143,16 +153,20 @@ function setupBattlefieldSocketEvents() {
     // 监听方格显示/隐藏事件
     window.socket.on('grid-visibility-updated', (data) => {
         if (data && data.isVisible !== undefined) {
+            console.log(`收到方格可见性更新事件: ${data.isVisible}`);
             updateGridVisibility(data.isVisible, false);
             const toggleGridBtn = document.getElementById('toggle-grid');
-            toggleGridBtn.textContent = data.isVisible ? '隐藏方格' : '显示方格';
-            toggleGridBtn.classList.toggle('active', !data.isVisible);
+            if (toggleGridBtn) {
+                toggleGridBtn.textContent = data.isVisible ? '隐藏方格' : '显示方格';
+                toggleGridBtn.classList.toggle('active', !data.isVisible);
+            }
         }
     });
     
     // 监听棋子大小更新事件
     window.socket.on('piece-size-updated', (data) => {
         if (data && data.size !== undefined) {
+            console.log(`收到棋子大小更新事件: ${data.size}`);
             updatePieceSize(data.size, false);
         }
     });
@@ -160,6 +174,15 @@ function setupBattlefieldSocketEvents() {
     // 监听战场状态更新事件
     window.socket.on('battlefield-state-updated', (data) => {
         if (data && data.state) {
+            console.log('收到战场状态更新事件');
+            loadBattlefieldState(data.state);
+        }
+    });
+    
+    // 监听战场初始状态事件
+    window.socket.on('battlefield-state', (data) => {
+        if (data && data.state) {
+            console.log('收到战场初始状态');
             loadBattlefieldState(data.state);
         }
     });
@@ -262,6 +285,8 @@ function updatePiecePosition(pieceId, x, y, emitEvent = true) {
     const piece = battlefieldPieces[pieceId];
     if (!piece) return;
     
+    console.log(`更新棋子 ${pieceId} 位置: (${x}, ${y})`);
+    
     // 更新位置
     piece.x = x;
     piece.y = y;
@@ -275,7 +300,7 @@ function updatePiecePosition(pieceId, x, y, emitEvent = true) {
     battlefieldState.pieces[pieceId].y = y;
     
     // 发送事件到服务器
-    if (emitEvent && window.socket) {
+    if (emitEvent && window.socket && window.socket.connected) {
         window.socket.emit('move-piece', {
             sessionId: window.sessionId,
             pieceId: pieceId,
@@ -289,13 +314,24 @@ function updatePiecePosition(pieceId, x, y, emitEvent = true) {
 }
 
 // 更新战场缩放
-function updateBattlefieldScale(scale) {
+function updateBattlefieldScale(scale, emitEvent = true) {
     // 限制缩放范围
     scale = Math.max(0.5, Math.min(3.0, scale));
     battlefieldScale = scale;
     
     // 应用缩放
     battlefieldGrid.style.transform = `scale(${scale})`;
+    
+    // 发送事件到服务器
+    if (emitEvent && window.socket && window.socket.connected) {
+        window.socket.emit('update-scale', {
+            sessionId: window.sessionId,
+            scale: scale
+        });
+        
+        // 延迟保存状态
+        debounce(saveBattlefieldStateToServer, 1000)();
+    }
 }
 
 // 更新方格显示/隐藏
@@ -313,7 +349,7 @@ function updateGridVisibility(isVisible, emitEvent = true) {
     battlefieldState.isGridVisible = isVisible;
     
     // 发送事件到服务器
-    if (emitEvent && window.socket) {
+    if (emitEvent && window.socket && window.socket.connected) {
         window.socket.emit('update-grid-visibility', {
             sessionId: window.sessionId,
             isVisible: isVisible
@@ -346,7 +382,7 @@ function updatePieceSize(size, emitEvent = true) {
     battlefieldState.pieceSize = size;
     
     // 发送事件到服务器
-    if (emitEvent && window.socket) {
+    if (emitEvent && window.socket && window.socket.connected) {
         window.socket.emit('update-piece-size', {
             sessionId: window.sessionId,
             size: size
@@ -419,12 +455,10 @@ function compressImage(file, callback) {
 
 // 更新背景图片
 function updateBackgroundImage(imageUrl, emitEvent = true) {
-    // 检查图片大小
-    if (imageUrl && imageUrl.length > 5 * 1024 * 1024) { // 如果大于5MB
-        alert('图片太大，请选择小于5MB的图片');
-        return;
-    }
-
+    if (!imageUrl) return;
+    
+    console.log("更新背景图片");
+    
     // 压缩图片
     const img = new Image();
     img.onload = function() {
@@ -463,7 +497,9 @@ function updateBackgroundImage(imageUrl, emitEvent = true) {
         battlefieldState.backgroundImage = compressedImageUrl;
         
         // 发送事件到服务器
-        if (emitEvent && window.socket) {
+        if (emitEvent && window.socket && window.socket.connected) {
+            console.log("发送背景更新事件");
+            
             // 检查压缩后的图片大小
             if (compressedImageUrl.length > 1024 * 1024) { // 如果大于1MB
                 console.log(`压缩后的图片较大 (${Math.round(compressedImageUrl.length / 1024)}KB)，使用分块发送`);
@@ -581,7 +617,7 @@ function handleMouseWheel(event) {
     
     // 根据滚轮方向调整缩放
     const delta = event.deltaY > 0 ? -0.1 : 0.1;
-    updateBattlefieldScale(battlefieldScale + delta);
+    updateBattlefieldScale(battlefieldScale + delta, true);
 }
 
 // 处理触摸开始事件
@@ -742,6 +778,8 @@ function loadBattlefieldStateFromServer() {
     const API_BASE_URL = 'https://dnd-database.zeabur.app/api/v1';
     const BATTLEFIELD_API_URL = `${API_BASE_URL}/battlefield`;
     
+    console.log("正在加载战场数据...");
+    
     fetch(`${BATTLEFIELD_API_URL}/sessions/${window.sessionId}`)
         .then(response => {
             if (!response.ok) {
@@ -750,11 +788,47 @@ function loadBattlefieldStateFromServer() {
             return response.json();
         })
         .then(result => {
-            if (result.success && result.data && Object.keys(result.data).length > 0) {
+            if (result.success && result.data) {
                 console.log("加载到战场数据:", result.data);
-                battlefieldState = result.data;
-                // 立即应用战场状态
+                
+                // 将服务器数据转换为前端使用的格式
+                const newState = {
+                    isGridVisible: result.data.settings?.gridVisible ?? true,
+                    pieceSize: result.data.settings?.pieceSize ?? 40,
+                    pieces: {}
+                };
+                
+                // 设置缩放比例
+                if (result.data.settings?.scale) {
+                    battlefieldScale = result.data.settings.scale;
+                }
+                
+                // 设置背景图片
+                if (result.data.background?.imageUrl) {
+                    newState.backgroundImage = result.data.background.imageUrl;
+                }
+                
+                // 转换棋子数据 - 从数组转为对象
+                if (Array.isArray(result.data.pieces)) {
+                    result.data.pieces.forEach(piece => {
+                        if (piece && piece.id) {
+                            newState.pieces[piece.id] = {
+                                x: piece.x || 0,
+                                y: piece.y || 0,
+                                name: piece.name || "",
+                                type: piece.type || "monster",
+                                currentHp: piece.currentHp || 0,
+                                maxHp: piece.maxHp || 0
+                            };
+                        }
+                    });
+                }
+                
+                battlefieldState = newState;
+                
+                // 应用战场状态
                 applyBattlefieldState();
+                
             } else {
                 console.log("没有找到战场数据或数据为空");
                 // 只有在真的没有数据时才初始化空状态
@@ -793,20 +867,48 @@ function saveBattlefieldStateToServer() {
         return;
     }
     
-    // 通过Socket.io发送战场状态
+    // 准备要发送的数据 - 转换为后端期望的格式
+    const dataToSend = {
+        // 将pieces对象转换为数组格式
+        pieces: Object.entries(battlefieldState.pieces || {}).map(([id, piece]) => ({
+            id: id,
+            ...piece,
+            name: piece.name || battlefieldPieces[id]?.name || "",
+            type: piece.type || (battlefieldPieces[id]?.isAdventurer ? "adventurer" : "monster"),
+            currentHp: piece.currentHp || battlefieldPieces[id]?.currentHp || 0,
+            maxHp: piece.maxHp || battlefieldPieces[id]?.maxHp || 0
+        })),
+        // 设置信息
+        settings: {
+            scale: battlefieldScale,
+            gridVisible: isGridVisible,
+            pieceSize: pieceSize
+        }
+    };
+    
+    // 如果有背景图，也包含它
+    if (battlefieldState.backgroundImage) {
+        dataToSend.background = {
+            imageUrl: battlefieldState.backgroundImage
+        };
+    }
+    
+    console.log("保存战场数据...");
+    
+    // 通过Socket.io发送战场状态 - 使用转换后的格式
     window.socket.emit('update-battlefield-state', {
         sessionId: window.sessionId,
-        state: battlefieldState
+        state: battlefieldState  // 客户端期望的原始格式
     });
     
-    // 使用API保存战场状态
+    // 使用API保存战场状态 - 使用后端期望的格式
     const API_BASE_URL = 'https://dnd-database.zeabur.app/api/v1';
     const BATTLEFIELD_API_URL = `${API_BASE_URL}/battlefield`;
     
     fetch(`${BATTLEFIELD_API_URL}/sessions/${window.sessionId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(battlefieldState)
+        body: JSON.stringify(dataToSend)
     })
         .then(response => {
             if (!response.ok) {
