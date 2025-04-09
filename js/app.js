@@ -6,6 +6,19 @@ window.socket = null;
 window.sessionId = null;
 window.confirmDialog = null;
 
+// Helper function for debouncing
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
 document.addEventListener("DOMContentLoaded", () => {
     const API_BASE_URL = 'https://dnd-server.zeabur.app/api/v1';
     const BATTLE_API_URL = `${API_BASE_URL}/battles`;
@@ -86,12 +99,28 @@ document.addEventListener("DOMContentLoaded", () => {
             if (!isLoadingData && monsterData) {
                 console.log("收到怪物更新:", monsterData.id);
                 createCardFromData(monsterData);
+                if (window.updatePieceHp && monsterData.hasOwnProperty('currentHp') && monsterData.hasOwnProperty('maxHp')) {
+                    window.updatePieceHp(monsterData.id, monsterData.currentHp, monsterData.maxHp);
+                }
+                if (window.updatePieceName && monsterData.hasOwnProperty('name')) {
+                    window.updatePieceName(monsterData.id, monsterData.name);
+                }
             }
         });
         socket.on('session-updated', (data) => {
             if (!isLoadingData && data) {
                 console.log("收到会话更新");
                 refreshUIFromData(data);
+                if (data.monsters && window.updatePieceHp && window.updatePieceName) {
+                     Object.values(data.monsters).forEach(monsterData => {
+                         if (monsterData.hasOwnProperty('currentHp') && monsterData.hasOwnProperty('maxHp')) {
+                             window.updatePieceHp(monsterData.id, monsterData.currentHp, monsterData.maxHp);
+                         }
+                         if (monsterData.hasOwnProperty('name')) {
+                             window.updatePieceName(monsterData.id, monsterData.name);
+                         }
+                     });
+                }
             }
         });
         socket.on('delete-monster', (data) => {
@@ -107,7 +136,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
         socket.on('dice-state-updated', (diceState) => {
-            if (!isLoadingData && !localUpdateInProgress) {
+            if (!isLoadingData) {
                 console.log("收到骰子状态更新:", diceState);
                 updateDiceUIFromData(diceState);
             }
@@ -115,28 +144,13 @@ document.addEventListener("DOMContentLoaded", () => {
         socket.on('dice-rolled', (rollData) => {
             if (!isLoadingData) {
                 console.log("收到骰子投掷结果:", rollData);
-                addRollToHistory(rollData);
-                displayRollHistory(playerName);
-                // 当收到其他客户端的骰子投掷结果时，也保存到本地数据库
-                // 但不要立即发送socket事件，避免无限循环
-                if (rollData && rollData.playerName !== playerName) {
-                    const saveTimer = setTimeout(() => {
-                        fetch(`${DICE_API_URL}/sessions/${sessionId}`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ 
-                                diceState: getCurrentDiceState(), 
-                                playerName: playerName,
-                                rollHistory: rollHistoryData 
-                            })
-                        }).then(response => response.json())
-                          .then(result => {
-                              console.log("更新骰子历史记录成功:", result.success);
-                          }).catch(error => {
-                              console.error("更新骰子历史记录失败:", error);
-                          });
-                    }, 300);
+                const progressBarContainer = document.querySelector(".progress-bar-container");
+                if (progressBarContainer) {
+                    progressBarContainer.style.display = "none";
                 }
+                addRollToHistory(playerName);
+                displayRollHistory(playerName);
+                document.getElementById("dice-result")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
             }
         });
         socket.on('roll-history-sync', (historyData) => {
@@ -145,6 +159,7 @@ document.addEventListener("DOMContentLoaded", () => {
             displayRollHistory(playerName);
         });
         socket.on('reset-dice', () => {
+            console.log("收到骰子重置确认");
             resetAllDice(false);
         });
     }
@@ -171,49 +186,49 @@ document.addEventListener("DOMContentLoaded", () => {
         // 初始化战场
         initBattlefield();
         
-        // 设置HP变化监听器
+        // Debounced functions for sending updates via WebSocket
+        const debouncedSendHpUpdate = debounce((monsterId, currentHp, maxHp, tempHp) => {
+            if (socket && socket.connected) {
+                 console.log(`Debounced: Emitting update-hp for ${monsterId}`);
+                 socket.emit('update-hp', { sessionId, monsterId, currentHp, maxHp, tempHp });
+            }
+        }, 500); // 500ms debounce for HP changes
+
+        const debouncedSendNameUpdate = debounce((monsterId, name) => {
+            if (socket && socket.connected) {
+                console.log(`Debounced: Emitting update-name for ${monsterId}`);
+                socket.emit('update-name', { sessionId, monsterId, name });
+            }
+        }, 500); // 500ms debounce for name changes
+
+        // Add new listeners inside initializeApp or preferably delegated from monsterContainer
         monsterContainer.addEventListener("input", (e) => {
-            const input = e.target;
-            if (input.classList.contains("current-hp-input") || input.classList.contains("max-hp-input") || input.classList.contains("temp-hp-input")) {
-                const card = input.closest(".monster-card");
-                if (card) {
-                    updateHpBar(card);
-                    
-                    // 同步到战场棋子
-                    const pieceId = card.dataset.id;
-                    const currentHp = card.querySelector(".current-hp-input").value;
-                    const maxHp = card.querySelector(".max-hp-input").value;
-                    if (window.updatePieceHp) {
-                        window.updatePieceHp(pieceId, currentHp, maxHp);
-                    }
-                    
-                    saveToServer();
-                }
+            const target = e.target;
+            const card = target.closest(".monster-card");
+            if (!card) return;
+            const monsterId = card.dataset.id;
+
+            // Handle HP input changes
+            if (target.classList.contains("current-hp-input") || target.classList.contains("max-hp-input") || target.classList.contains("temp-hp-input")) {
+                // Update local HP bar immediately for responsiveness
+                updateHpBar(card);
+                
+                // Get all HP values from the card
+                const currentHp = card.querySelector(".current-hp-input").value;
+                const maxHp = card.querySelector(".max-hp-input").value;
+                const tempHp = card.querySelector(".temp-hp-input").value || 0;
+
+                // Send debounced update via WebSocket
+                debouncedSendHpUpdate(monsterId, currentHp, maxHp, tempHp);
             }
             
-            // 监听名称变更
-            if (input.classList.contains("monster-name")) {
-                const card = input.closest(".monster-card");
-                if (card) {
-                    // 同步到战场棋子名称
-                    const pieceId = card.dataset.id;
-                    const name = input.textContent;
-                    if (window.updatePieceName) {
-                        window.updatePieceName(pieceId, name);
-                    }
-                    
-                    saveToServer();
-                }
+            // Handle Name input changes (using input event + debounce)
+            if (target.classList.contains("monster-name")) {
+                const name = target.textContent;
+                 // Send debounced update via WebSocket
+                 debouncedSendNameUpdate(monsterId, name);
             }
         });
-        
-        // 添加对名称blur事件的监听，确保在编辑结束时同步
-        monsterContainer.addEventListener("blur", (e) => {
-            const target = e.target;
-            if (target.classList.contains("monster-name")) {
-                saveToServer(true); // 立即保存，确保同步
-            }
-        }, true); // 使用捕获阶段
     }
     function loadFromServer(isInitialLoad = false) {
         if (isLoadingData) return;
@@ -223,7 +238,9 @@ document.addEventListener("DOMContentLoaded", () => {
             updateSyncStatus("syncing", "正在加载数据");
         }
         console.log("正在加载会话数据...");
-        fetch(`${BATTLE_API_URL}/sessions/${sessionId}`)
+        fetch(`${BATTLE_API_URL}/sessions/${sessionId}`, {
+            mode: 'no-cors'
+        })
             .then(response => {
                 if (!response.ok) {
                     throw new Error(`HTTP错误! 状态: ${response.status}`);
@@ -256,7 +273,9 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     function loadDiceFromServer() {
         console.log("正在加载骰子会话数据...");
-        fetch(`${DICE_API_URL}/sessions/${sessionId}`)
+        fetch(`${DICE_API_URL}/sessions/${sessionId}`, {
+            mode: 'no-cors'
+        })
             .then(response => {
                 if (!response.ok) {
                     throw new Error(`HTTP错误! 状态: ${response.status}`);
@@ -284,169 +303,99 @@ document.addEventListener("DOMContentLoaded", () => {
             });
     }
     function saveToServer(immediate = false) {
-        if (isLoadingData || !isConnected) return;
-        if (pendingSaveTimer) {
-            clearTimeout(pendingSaveTimer);
-            pendingSaveTimer = null;
-        }
-        if (!immediate) {
-            pendingSaveTimer = setTimeout(() => saveToServer(true), 300);
-            return;
-        }
-        updateSyncStatus("syncing", "正在保存会话数据...");
-        console.log("正在保存会话数据...");
-        const monstersMap = {};
-        document.querySelectorAll('.monster-card').forEach(card => {
-            const monsterId = card.dataset.id;
-            const monsterData = {
-                id: monsterId,
-                type: card.dataset.type,
-                name: card.querySelector('.monster-name').textContent,
-                currentHp: card.querySelector('.current-hp-input').value,
-                maxHp: card.querySelector('.max-hp-input').value,
-                tempHp: card.querySelector('.temp-hp-input').value || 0,
-                conditions: card.dataset.conditions || '[]',
-                isLocked: card.classList.contains('locked')
-            };
-            monstersMap[monsterId] = monsterData;
-            if (socket && socket.connected) {
-                socket.emit('update-monster', { sessionId: sessionId, monster: monsterData });
-            }
-        });
-        if (socket && socket.connected) {
-            const sessionData = { monsters: monstersMap };
-            socket.emit('session-update', { sessionId: sessionId, data: sessionData });
-        }
-        const saveTime = Date.now();
-        lastSaveTime = saveTime;
-        fetch(`${BATTLE_API_URL}/sessions/${sessionId}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ monsters: monstersMap })
-        })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP错误! 状态: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(result => {
-                if (saveTime === lastSaveTime) {
-                    if (result.success) {
-                        console.log("数据保存成功");
-                        updateSyncStatus("success", "已保存");
-                    } else {
-                        console.error("保存失败:", result.error);
-                        updateSyncStatus("error", "保存失败");
-                    }
-                }
-            })
-            .catch(error => {
-                console.error("保存数据出错:", error);
-                updateSyncStatus("error", "保存失败");
-                showSaveError(error, saveToServer);
-            });
+        console.log("saveToServer called, but HTTP POST is disabled. State sync relies on WebSocket.");
+        // 如果需要，可以在这里触发一次WebSocket同步请求，但这取决于服务器设计
+        // 例如: if (socket && socket.connected) socket.emit('request-state-save', { sessionId });
+        // 但更推荐的方式是服务器根据收到的增量更新自动保存
     }
     function saveDiceToServer(immediate = false) {
-        if (isLoadingData || !isConnected) return;
-        if (pendingSaveTimer) {
-            clearTimeout(pendingSaveTimer);
-            pendingSaveTimer = null;
-        }
-        if (!immediate) {
-            pendingSaveTimer = setTimeout(() => saveDiceToServer(true), 300);
-            return;
-        }
-        updateSyncStatus("syncing", "正在保存骰子数据...");
-        console.log("正在保存骰子会话数据...");
+        updateSyncStatus("syncing", "正在同步骰子状态 (WebSocket)...");
+        console.log("正在同步骰子状态 (WebSocket)... (saveDiceToServer)");
         const diceState = getCurrentDiceState();
-        localUpdateInProgress = true;
-        setTimeout(() => {
-            localUpdateInProgress = false;
-        }, 500);
-        if (socket && socket.connected) {
+        if (socket && socket.connected && diceState) {
             socket.emit('update-dice-state', { sessionId: sessionId, playerName: playerName, diceState: diceState });
+             console.log("Emitted update-dice-state via WebSocket.");
+             updateSyncStatus("success", "骰子状态已同步");
+        } else {
+             console.warn("无法通过 WebSocket 同步骰子状态: Socket未连接或骰子状态无效");
+             updateSyncStatus("error", "骰子同步失败");
         }
-        const saveTime = Date.now();
-        lastSaveTime = saveTime;
-        fetch(`${DICE_API_URL}/sessions/${sessionId}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                diceState: diceState, 
-                playerName: playerName,
-                rollHistory: rollHistoryData 
-            })
-        })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP错误! 状态: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(result => {
-                if (saveTime === lastSaveTime) {
-                    if (result.success) {
-                        console.log("骰子数据保存成功");
-                        updateSyncStatus("success", "已保存");
-                    } else {
-                        console.error("骰子保存失败:", result.error);
-                        updateSyncStatus("error", "保存失败");
-                    }
-                }
-            })
-            .catch(error => {
-                console.error("保存骰子数据出错:", error);
-                updateSyncStatus("error", "保存失败");
-            });
     }
     function setupEventListeners() {
         addMonsterBtn.addEventListener("click", () => {
             if (!isConnected) return alert("未连接到服务器，请检查网络连接并刷新页面");
             const name = `${monsterNamePrefix.value} ${monsterCounter++}`;
             const maxHp = parseInt(defaultHpInput.value) || 100;
-            monsterContainer.appendChild(createMonsterCard(name, maxHp, false, saveToServer));
-            updateSortButtonStatus();
-            saveToServer();
+            // 创建怪物数据对象，但不立即添加到 DOM
+            const monsterData = createMonsterData(name, maxHp, false); 
+            if (monsterData) {
+                 // 发送 add-monster 事件到服务器
+                 if (socket && socket.connected) {
+                     console.log("Emitting add-monster:", monsterData);
+                     socket.emit('add-monster', { sessionId: window.sessionId, monster: monsterData });
+                 }
+                 // 服务器广播 monster-updated 后，客户端会创建卡片
+                 // monsterContainer.appendChild(createMonsterCard(name, maxHp, false)); // 不再直接添加
+                 // updateSortButtonStatus(); // 状态更新后由相应事件处理
+            }
         });
+
         addAdventurerBtn.addEventListener("click", () => {
             if (!isConnected) return alert("未连接到服务器，请检查网络连接并刷新页面");
             const name = `${adventurerNamePrefix.value} ${adventurerCounter++}`;
             const maxHp = parseInt(defaultHpInput.value) || 100;
-            monsterContainer.appendChild(createMonsterCard(name, maxHp, true, saveToServer));
-            updateSortButtonStatus();
-            saveToServer();
+             // 创建冒险者数据对象
+             const adventurerData = createMonsterData(name, maxHp, true);
+             if (adventurerData) {
+                  // 发送 add-monster 事件到服务器
+                 if (socket && socket.connected) {
+                     console.log("Emitting add-monster (adventurer):", adventurerData);
+                     socket.emit('add-monster', { sessionId: window.sessionId, monster: adventurerData });
+                 }
+                  // 服务器广播 monster-updated 后，客户端会创建卡片
+                 // monsterContainer.appendChild(createMonsterCard(name, maxHp, true)); // 不再直接添加
+                 // updateSortButtonStatus(); // 状态更新后由相应事件处理
+             }
         });
         resetAllBtn.addEventListener("click", () => {
             if (!isConnected) return alert("未连接到服务器，请检查网络连接并刷新页面");
-            if (confirm("确定要移除所有非锁定的怪物和冒险者吗？")) {
-                document.querySelectorAll('.monster-card:not(.locked)').forEach(card => card.remove());
-                const hasMonsterCards = monsterContainer.querySelectorAll('.monster-card').length > 0;
-                const hasEmptyState = monsterContainer.querySelector('.empty-state');
-                if (!hasMonsterCards && !hasEmptyState) {
-                    showEmptyState(monsterContainer);
-                }
-                updateSortButtonStatus();
-                saveToServer();
-            }
+            confirmDialog.show("确定要移除所有非锁定的怪物和冒险者吗？", () => {
+                 console.log("用户确认重置");
+                 const idsToRemove = [];
+                 document.querySelectorAll('.monster-card:not(.locked)').forEach(card => {
+                     idsToRemove.push(card.dataset.id);
+                     card.remove();
+                 });
+
+                 const hasMonsterCards = monsterContainer.querySelectorAll('.monster-card').length > 0;
+                 const hasEmptyState = monsterContainer.querySelector('.empty-state');
+                 if (!hasMonsterCards && !hasEmptyState) {
+                     showEmptyState(monsterContainer);
+                 }
+                 updateSortButtonStatus();
+
+                 if (socket && socket.connected && idsToRemove.length > 0) {
+                     console.log("Emitting batch-delete-monsters with IDs:", idsToRemove);
+                     socket.emit('batch-delete-monsters', { sessionId: window.sessionId, monsterIds: idsToRemove });
+                 }
+             });
         });
         manualSyncBtn.addEventListener("click", () => {
             if (!isConnected) return alert("未连接到服务器，请检查网络连接并刷新页面");
             manualSyncBtn.classList.add("syncing");
-            updateSyncStatus("syncing", "手动同步中...");
-            saveToServer(true);
+            updateSyncStatus("syncing", "正在请求最新状态...");
+
+            if (socket && socket.connected) {
+                console.log("Emitting request-latest-state");
+                socket.emit('request-latest-state', { sessionId: window.sessionId });
+                socket.emit('request-latest-dice-state', { sessionId: window.sessionId });
+                socket.emit('request-latest-battlefield-state', { sessionId: window.sessionId });
+            }
+
             setTimeout(() => {
-                loadFromServer();
-                loadDiceFromServer();
-                setTimeout(() => manualSyncBtn.classList.remove("syncing"), 1000);
-            }, 1000);
-        });
-        
-        // 战场按钮事件监听器
-        const battlefieldBtn = document.getElementById("battlefield-btn");
-        battlefieldBtn.addEventListener("click", () => {
-            if (!isConnected) return alert("未连接到服务器，请检查网络连接并刷新页面");
-            openBattlefield();
+                manualSyncBtn.classList.remove("syncing");
+                 updateSyncStatus("success", "同步请求已发送");
+            }, 1500);
         });
         
         closeStatusBtn.addEventListener("click", () => statusSelector.classList.remove("active"));
@@ -553,21 +502,5 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         }
     }
-    function setupAutoSave() {
-        let autoSaveInterval;
-        if (autoSaveInterval) clearInterval(autoSaveInterval);
-        autoSaveInterval = setInterval(() => {
-            if (isConnected && !isLoadingData) {
-                console.log("执行自动保存...");
-                saveToServer();
-            }
-        }, 30000);
-    }
     initializeApp();
-    setupAutoSave();
-    
-    // 将关键变量和函数暴露到全局作用域
-    window.saveToServer = saveToServer;
-    window.sessionId = sessionId;
-    window.confirmDialog = confirmDialog;
 });

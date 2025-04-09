@@ -1,5 +1,4 @@
 let rollHistoryData = [];
-let localUpdateInProgress = false;
 let globalSocket = null;
 let globalSessionId = null;
 let globalPlayerName = null;
@@ -114,16 +113,15 @@ function resetAllDice(emitEvent = true) {
     document.getElementById('global-disadvantage').checked = false;
     document.getElementById("dice-result").innerHTML = "";
     document.querySelector(".progress-bar-container").style.display = "none";
-    rollHistoryData = [];
-    displayRollHistory(globalPlayerName);
     
     if (emitEvent) {
         if (globalSocket && globalSocket.connected) {
-            globalSocket.emit('reset-dice', { sessionId: globalSessionId, playerName: globalPlayerName });
+            console.log("Emitting reset-dice-request");
+            globalSocket.emit('reset-dice-request', { sessionId: globalSessionId, playerName: globalPlayerName });
         }
-        if (typeof globalSaveDiceToServer === 'function') {
-            globalSaveDiceToServer(true);
-        }
+    } else {
+        rollHistoryData = [];
+        displayRollHistory(globalPlayerName);
     }
 }
 
@@ -155,9 +153,15 @@ function setupDiceEvents(socket, sessionId, playerName, saveDiceToServer) {
         const plus5Btn = controls.querySelector(".plus5");
         const minus5Btn = controls.querySelector(".minus5");
         function updateQuantity(change) {
-            const newValue = Math.max(0, Math.min(99, parseInt(display.textContent) + change));
-            display.textContent = newValue;
-            saveDiceToServer();
+            const oldValue = parseInt(display.textContent);
+            const newValue = Math.max(0, Math.min(99, oldValue + change));
+            if (newValue !== oldValue) {
+                display.textContent = newValue;
+                if (globalSaveDiceToServer) {
+                    console.log("Dice quantity changed, calling globalSaveDiceToServer (WebSocket sync)");
+                    globalSaveDiceToServer();
+                }
+            }
         }
         plusBtn.addEventListener("click", () => updateQuantity(1));
         minusBtn.addEventListener("click", () => updateQuantity(-1));
@@ -168,43 +172,60 @@ function setupDiceEvents(socket, sessionId, playerName, saveDiceToServer) {
         if (globalAdvantage.checked) {
             globalDisadvantage.checked = false;
         }
-        saveDiceToServer();
+        if (globalSaveDiceToServer) {
+             console.log("Advantage changed, calling globalSaveDiceToServer (WebSocket sync)");
+            globalSaveDiceToServer();
+        }
     });
     globalDisadvantage.addEventListener("change", () => {
         if (globalDisadvantage.checked) {
             globalAdvantage.checked = false;
         }
-        saveDiceToServer();
+        if (globalSaveDiceToServer) {
+             console.log("Disadvantage changed, calling globalSaveDiceToServer (WebSocket sync)");
+             globalSaveDiceToServer();
+        }
     });
     rollButton.addEventListener("click", () => {
         progressBar.style.width = "0%";
         progressBarContainer.style.display = "block";
         progressBarContainer.scrollIntoView({ behavior: "smooth" });
-        let allRolls = {};
-        const isAdvantage = globalAdvantage.checked;
-        const isDisadvantage = globalDisadvantage.checked;
+
+        const diceConfig = {
+             dice: {},
+             advantage: globalAdvantage.checked,
+             disadvantage: globalDisadvantage.checked
+        };
+        let totalDiceCount = 0;
         document.querySelectorAll(".dice-card").forEach((card) => {
             const diceType = card.dataset.dice;
             const quantity = +card.querySelector(".current-quantity").textContent;
-            if (quantity === 0) return;
-            const sides = parseInt(diceType.substring(1));
-            allRolls[diceType] = { quantity: quantity, rolls: [], subtotal: 0 };
-            for (let i = 0; i < quantity; i++) {
-                if (isAdvantage || isDisadvantage) {
-                    const roll1 = getRandomInt(1, sides);
-                    const roll2 = getRandomInt(1, sides);
-                    const finalRoll = isAdvantage ? Math.max(roll1, roll2) : Math.min(roll1, roll2);
-                    allRolls[diceType].rolls.push({ roll1, roll2, finalRoll, isAdvantage });
-                    allRolls[diceType].subtotal += finalRoll;
-                } else {
-                    const roll = getRandomInt(1, sides);
-                    allRolls[diceType].rolls.push(roll);
-                    allRolls[diceType].subtotal += roll;
-                }
+            if (quantity > 0) {
+                 diceConfig.dice[diceType] = quantity;
+                 totalDiceCount += quantity;
             }
         });
-        const duration = 1000;
+
+        if (totalDiceCount === 0) {
+            console.log("No dice selected to roll.");
+            progressBarContainer.style.display = "none";
+            const resultDiv = document.getElementById("dice-result");
+            const noDiceMsg = document.createElement("p");
+            noDiceMsg.textContent = "请先选择要投掷的骰子数量。";
+            noDiceMsg.style.textAlign = "center";
+            noDiceMsg.style.color = "orange";
+            resultDiv.insertBefore(noDiceMsg, resultDiv.firstChild);
+            setTimeout(() => {
+                if (noDiceMsg.parentNode === resultDiv) {
+                    resultDiv.removeChild(noDiceMsg);
+                }
+            }, 3000);
+            return;
+        }
+
+        const duration = 500;
         const startTime = performance.now();
+
         function animate() {
             const now = performance.now();
             const progress = Math.min((now - startTime) / duration, 1);
@@ -212,25 +233,23 @@ function setupDiceEvents(socket, sessionId, playerName, saveDiceToServer) {
             if (progress < 1) {
                 requestAnimationFrame(animate);
             } else {
-                progressBarContainer.style.display = "none";
-                const rollData = {
-                    playerName: playerName,
-                    timestamp: new Date().toISOString(),
-                    rolls: allRolls
-                };
-                addRollToHistory(rollData);
-                displayRollHistory(playerName);
-                if (socket && socket.connected) {
-                    socket.emit('roll-dice', { sessionId: sessionId, rollData: rollData });
-                }
-                if (typeof globalSaveDiceToServer === 'function') {
-                    globalSaveDiceToServer(true);
-                }
-                document.getElementById("dice-result").scrollIntoView({ behavior: "smooth" });
             }
         }
         requestAnimationFrame(animate);
+
+        console.log("Emitting roll-dice with config:", diceConfig);
+        if (socket && socket.connected) {
+             socket.emit('roll-dice', {
+                 sessionId: sessionId,
+                 playerName: playerName,
+                 diceConfig: diceConfig
+             });
+        } else {
+            console.error("Socket not connected, cannot roll dice.");
+            progressBarContainer.style.display = "none";
+        }
     });
+
     diceResetButton.addEventListener("click", () => {
         resetAllDice(true);
     });
