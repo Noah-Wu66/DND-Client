@@ -104,6 +104,10 @@ document.addEventListener("DOMContentLoaded", () => {
             setButtonsEnabled(true);
             socket.emit('join-session', sessionId);
             socket.emit('join-dice-session', { sessionId: sessionId, playerName: playerName });
+            
+            // 移动到这里：确保WebSocket连接成功后再加载数据
+            loadFromServer(true);
+            loadDiceFromServer();
         });
         socket.on('disconnect', () => {
             console.log('与服务器断开连接');
@@ -194,8 +198,6 @@ document.addEventListener("DOMContentLoaded", () => {
         showLoadingState("正在连接到服务器...");
         updateSyncStatus("connecting", "正在连接");
         initSocketConnection();
-        loadFromServer(true);
-        loadDiceFromServer();
         setupCopySessionLink();
         setupDiceEvents(socket, sessionId, playerName, saveDiceToServer);
         setupEventListeners();
