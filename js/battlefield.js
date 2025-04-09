@@ -848,6 +848,17 @@ function debounce(func, wait) {
     };
 }
 
+// 保存战场状态到服务器
+function saveBattlefieldStateToServer() {
+    if (!window.socket || !window.sessionId) return;
+    
+    console.log("保存战场状态到服务器...");
+    window.socket.emit('update-battlefield-state', {
+        sessionId: window.sessionId,
+        state: battlefieldState
+    });
+}
+
 // 导出函数
 window.openBattlefield = openBattlefield;
 window.initBattlefield = initBattlefield;
