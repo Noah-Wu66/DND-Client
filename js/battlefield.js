@@ -739,7 +739,7 @@ function loadBattlefieldStateFromServer() {
     });
     
     // 使用API加载战场状态
-    const API_BASE_URL = 'https://dnd-database.zeabur.app/api/v1';
+    const API_BASE_URL = 'http://dnd-server.zeabur.app/api/v1';
     const BATTLEFIELD_API_URL = `${API_BASE_URL}/battlefield`;
     
     fetch(`${BATTLEFIELD_API_URL}/sessions/${window.sessionId}`)
@@ -800,7 +800,7 @@ function saveBattlefieldStateToServer() {
     });
     
     // 使用API保存战场状态
-    const API_BASE_URL = 'https://dnd-database.zeabur.app/api/v1';
+    const API_BASE_URL = 'http://dnd-server.zeabur.app/api/v1';
     const BATTLEFIELD_API_URL = `${API_BASE_URL}/battlefield`;
     
     fetch(`${BATTLEFIELD_API_URL}/sessions/${window.sessionId}`, {
