@@ -79,8 +79,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // --- 添加 createMonsterData 函数定义 ---
     function createMonsterData(name, maxHp, isAdventurer) {
-        // 创建基础数据对象，服务器会处理 ID 和其他细节
+        // 创建临时ID，服务器端需要这个ID
+        const tempId = Date.now().toString(36) + Math.random().toString(36).substring(2, 7);
+        
+        // 创建基础数据对象，服务器端需要id字段
         return {
+            id: tempId,
             name: name,
             maxHp: parseInt(maxHp) || 100,
             currentHp: parseInt(maxHp) || 100, // 默认满血
@@ -88,7 +92,6 @@ document.addEventListener("DOMContentLoaded", () => {
             isAdventurer: !!isAdventurer,
             conditions: [],
             initiative: null
-            // 注意：ID 由服务器生成
         };
     }
     // --- 结束添加 ---
