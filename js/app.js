@@ -7,10 +7,10 @@ window.sessionId = null;
 window.confirmDialog = null;
 
 document.addEventListener("DOMContentLoaded", () => {
-    const API_BASE_URL = 'http://dnd-server.zeabur.app/api/v1';
+    const API_BASE_URL = 'https://dnd-server.zeabur.app/api/v1';
     const BATTLE_API_URL = `${API_BASE_URL}/battles`;
     const DICE_API_URL = `${API_BASE_URL}/dice`;
-    const SOCKET_URL = 'http://dnd-server.zeabur.app';
+    const SOCKET_URL = 'https://dnd-server.zeabur.app';
     let sessionId = new URLSearchParams(window.location.search).get('session');
     if (!sessionId) {
         const randomPart = Math.random().toString(36).substring(2, 12);
