@@ -76,6 +76,23 @@ document.addEventListener("DOMContentLoaded", () => {
     const conditionTooltip = createConditionTooltip();
     confirmDialog = setupConfirmDialog();
     window.confirmDialog = confirmDialog;
+
+    // --- 添加 createMonsterData 函数定义 ---
+    function createMonsterData(name, maxHp, isAdventurer) {
+        // 创建基础数据对象，服务器会处理 ID 和其他细节
+        return {
+            name: name,
+            maxHp: parseInt(maxHp) || 100,
+            currentHp: parseInt(maxHp) || 100, // 默认满血
+            tempHp: 0,
+            isAdventurer: !!isAdventurer,
+            conditions: [],
+            initiative: null
+            // 注意：ID 由服务器生成
+        };
+    }
+    // --- 结束添加 ---
+
     function initSocketConnection() {
         socket = io(SOCKET_URL);
         window.socket = socket;
@@ -232,75 +249,108 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     function loadFromServer(isInitialLoad = false) {
         if (isLoadingData) return;
-        isLoadingData = true;
+        // isLoadingData = true; // WebSocket 连接成功后由服务器推送，不再需要手动加载状态
         if (isInitialLoad) {
-            showLoadingState("正在加载战斗数据...");
-            updateSyncStatus("syncing", "正在加载数据");
+            // 保持 Loading 状态，直到 WebSocket 连接并收到初始数据
+            // showLoadingState("正在加载战斗数据...");
+            // updateSyncStatus("syncing", "正在加载数据");
         }
+        console.log("请求最新战斗状态 (通过 WebSocket)...");
+        if (socket && socket.connected) {
+            socket.emit('request-latest-state', { sessionId: window.sessionId });
+        } else {
+            console.warn("loadFromServer 调用时 WebSocket 未连接");
+            // WebSocket 连接成功后会自动请求
+        }
+        
+        /* 注释掉 fetch 调用，改用 WebSocket
         console.log("正在加载会话数据...");
         fetch(`${BATTLE_API_URL}/sessions/${sessionId}`, {
-            mode: 'no-cors'
+            // mode: 'no-cors' // no-cors 会导致无法读取响应内容，且此处应使用 WebSocket
         })
             .then(response => {
                 if (!response.ok) {
+                    // 404 或其他错误
+                     console.error(`加载数据HTTP错误! 状态: ${response.status}`);
                     throw new Error(`HTTP错误! 状态: ${response.status}`);
                 }
-                return response.json();
+                 // 检查 content-type 是否为 application/json
+                const contentType = response.headers.get("content-type");
+                if (contentType && contentType.indexOf("application/json") !== -1) {
+                    return response.json();
+                } else {
+                    console.error("收到的响应不是 JSON 格式");
+                    throw new Error("响应格式错误");
+                }
             })
             .then(result => {
-                if (result.success && result.data) {
-                    console.log("加载到数据:", result.data);
+                console.log("从服务器加载的数据:", result);
+                if (result && result.data) {
+                     hideLoadingState();
                     refreshUIFromData(result.data);
+                    updateSyncStatus("success", "数据已加载");
                 } else {
-                    console.log("没有找到会话数据或数据为空");
-                    const hasMonsterCards = monsterContainer.querySelectorAll('.monster-card').length > 0;
-                    const hasEmptyState = monsterContainer.querySelector('.empty-state');
-                    if (!hasMonsterCards && !hasEmptyState) {
-                        showEmptyState(monsterContainer);
-                    }
+                    console.log("未找到会话数据，或数据为空");
+                    hideLoadingState();
+                    showEmptyState(monsterContainer);
+                    updateSyncStatus("success", "就绪 (新会话)");
                 }
-                isLoadingData = false;
-                hideLoadingState();
-                updateSyncStatus("success", "数据已加载");
             })
             .catch(error => {
-                console.error("加载数据出错:", error);
-                isLoadingData = false;
-                hideLoadingState();
-                updateSyncStatus("error", "加载失败");
-                if (isInitialLoad) showLoadingError(error, loadFromServer);
+                 console.error("加载数据出错:", error);
+                 updateSyncStatus("error", "加载失败");
+                 // 显示错误信息，但不阻塞UI
+                 // hideLoadingState(); 
+                 showConnectionError(initializeApp); // 或者显示一个更通用的错误提示
+            })
+            .finally(() => {
+                 isLoadingData = false;
             });
+         */
     }
     function loadDiceFromServer() {
-        console.log("正在加载骰子会话数据...");
-        fetch(`${DICE_API_URL}/sessions/${sessionId}`, {
-            mode: 'no-cors'
-        })
+         // isLoadingData = true; // 由 WebSocket 处理
+         console.log("请求最新骰子状态 (通过 WebSocket)...");
+         if (socket && socket.connected) {
+             socket.emit('request-latest-dice-state', { sessionId: window.sessionId });
+             socket.emit('request-latest-roll-history', { sessionId: window.sessionId }); // 同时请求历史记录
+         } else {
+             console.warn("loadDiceFromServer 调用时 WebSocket 未连接");
+         }
+
+        /* 注释掉 fetch 调用，改用 WebSocket
+        fetch(`${DICE_API_URL}/sessions/${sessionId}`)
             .then(response => {
                 if (!response.ok) {
+                     console.error(`加载骰子数据HTTP错误! 状态: ${response.status}`);
                     throw new Error(`HTTP错误! 状态: ${response.status}`);
                 }
-                return response.json();
+                const contentType = response.headers.get("content-type");
+                if (contentType && contentType.indexOf("application/json") !== -1) {
+                    return response.json();
+                } else {
+                    console.error("收到的骰子响应不是 JSON 格式");
+                    throw new Error("响应格式错误");
+                }
             })
             .then(result => {
-                if (result.success && result.data) {
-                    console.log("加载到骰子数据:", result.data);
-                    if (result.data.diceState) {
-                        updateDiceUIFromData(result.data.diceState);
-                    }
-                    if (result.data.rollHistory && result.data.rollHistory.length > 0) {
-                        rollHistoryData = result.data.rollHistory;
-                        displayRollHistory(playerName);
-                    }
+                if (result && result.data) {
+                    console.log("骰子数据加载:", result.data);
+                    updateDiceUIFromData(result.data.diceState);
+                    rollHistoryData = result.data.rollHistory || [];
+                    displayRollHistory(playerName);
                 } else {
-                    console.log("没有找到骰子会话数据或数据为空");
-                    // 只有在真的没有数据时才初始化并保存
-                    saveDiceToServer();
+                    console.log("未找到骰子会话数据");
+                     resetAllDice(false); // 如果服务器没数据，重置本地UI
+                     rollHistoryData = [];
+                     displayRollHistory(playerName);
                 }
             })
             .catch(error => {
-                console.error("加载骰子数据出错:", error);
+                 console.error("加载骰子数据出错:", error);
+                 // 不阻塞UI，允许用户继续使用骰子
             });
+         */
     }
     function saveToServer(immediate = false) {
         console.log("saveToServer called, but HTTP POST is disabled. State sync relies on WebSocket.");
@@ -483,24 +533,6 @@ document.addEventListener("DOMContentLoaded", () => {
         if (diceBtn) diceBtn.removeEventListener("click", () => {
             diceDialog.classList.add("active");
         });
-        
-        // 移除战场按钮的原有点击事件
-        if (battlefieldBtn) {
-            const newBattlefieldBtn = battlefieldBtn.cloneNode(true);
-            battlefieldBtn.parentNode.replaceChild(newBattlefieldBtn, battlefieldBtn);
-            // 为新按钮重新添加点击事件
-            newBattlefieldBtn.addEventListener("click", (e) => {
-                e.preventDefault();
-                const scrollPosition = window.scrollY;
-                setTimeout(() => {
-                    openBattlefield();
-                    window.scrollTo({
-                        top: scrollPosition,
-                        behavior: "auto"
-                    });
-                }, 10);
-            });
-        }
     }
     initializeApp();
 });
