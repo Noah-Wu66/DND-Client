@@ -49,13 +49,23 @@ function addRollToHistory(rollData) {
 
 function displayRollHistory(currentPlayerName) {
     const resultDiv = document.getElementById("dice-result");
+    if (!resultDiv) return;
+
     resultDiv.innerHTML = "";
     if (rollHistoryData.length === 0) {
         resultDiv.innerHTML = "<p style='text-align:center;color:#999;'>暂无骰子记录</p>";
         return;
     }
+
+    // 确保玩家名称有效
+    if (!currentPlayerName) {
+        currentPlayerName = globalPlayerName || localStorage.getItem('playerName') || "未知玩家";
+    }
+
     rollHistoryData.sort((a, b) => new Date(a.timestamp || 0) - new Date(b.timestamp || 0));
     rollHistoryData.forEach(rollData => {
+        if (!rollData) return;
+
         const rollContainer = document.createElement("div");
         rollContainer.className = "roll-container";
         const playerInfo = document.createElement("div");
@@ -113,7 +123,7 @@ function resetAllDice(emitEvent = true) {
     document.getElementById('global-disadvantage').checked = false;
     document.getElementById("dice-result").innerHTML = "";
     document.querySelector(".progress-bar-container").style.display = "none";
-    
+
     if (emitEvent) {
         if (globalSocket && globalSocket.connected) {
             console.log("Emitting reset-dice-request");
@@ -130,7 +140,7 @@ function setupDiceEvents(socket, sessionId, playerName, saveDiceToServer) {
     globalSessionId = sessionId;
     globalPlayerName = playerName;
     globalSaveDiceToServer = saveDiceToServer;
-    
+
     const diceBtn = document.getElementById("dice-btn");
     const diceDialog = document.getElementById("dice-dialog");
     const closeDiceBtn = document.querySelector(".close-dice");
@@ -239,11 +249,16 @@ function setupDiceEvents(socket, sessionId, playerName, saveDiceToServer) {
 
         console.log("Emitting roll-dice with config:", diceConfig);
         if (socket && socket.connected) {
-             socket.emit('roll-dice', {
-                 sessionId: sessionId,
-                 playerName: playerName,
-                 diceConfig: diceConfig
-             });
+            // 确保玩家名称有效
+            const effectivePlayerName = playerName || globalPlayerName || localStorage.getItem('playerName') || "未知玩家";
+
+            socket.emit('roll-dice', {
+                sessionId: sessionId,
+                playerName: effectivePlayerName,
+                diceConfig: diceConfig
+            });
+
+            console.log(`发送骰子投掉请求，玩家名称: ${effectivePlayerName}`);
         } else {
             console.error("Socket not connected, cannot roll dice.");
             progressBarContainer.style.display = "none";

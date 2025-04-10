@@ -25,7 +25,6 @@
                 <button id="dice-btn">骰子模拟</button>
                 <button id="items-btn">物品查询</button>
                 <button id="spells-btn">法术查询</button>
-                <button id="battlefield-btn">查看战场</button>
             </div>
             <div class="setup-form">
                 <div class="form-group">
@@ -230,39 +229,7 @@
         </div>
     </div>
 
-    <!-- 战场对话框 -->
-    <div class="battlefield-dialog" id="battlefield-dialog">
-        <div class="battlefield-panel">
-            <div class="battlefield-header">
-                <h2 class="battlefield-title">战场</h2>
-                <button class="close-battlefield">×</button>
-            </div>
-            <div class="battlefield-controls">
-                <div class="battlefield-tools">
-                    <label for="upload-background" class="upload-btn">
-                        上传背景图
-                        <input type="file" id="upload-background" accept="image/*" style="display: none;">
-                    </label>
-                    <button id="zoom-in" class="zoom-btn">放大</button>
-                    <button id="zoom-out" class="zoom-btn">缩小</button>
-                    <button id="reset-zoom" class="zoom-btn">重置缩放</button>
-                    <button id="toggle-grid" class="toggle-btn">隐藏方格</button>
-                    <button id="refresh-battlefield" class="toggle-btn">刷新战场</button>
-                    <div class="piece-size-control">
-                        <span>棋子大小:</span>
-                        <button id="decrease-piece-size" class="size-btn">-</button>
-                        <span id="piece-size-value">40px</span>
-                        <button id="increase-piece-size" class="size-btn">+</button>
-                    </div>
-                </div>
-            </div>
-            <div id="battlefield-container" class="battlefield-container">
-                <div id="battlefield-grid" class="battlefield-grid">
-                    <!-- 棋子将在这里动态生成 -->
-                </div>
-            </div>
-        </div>
-    </div>
+
 
     <div id="sync-status">
         <span class="sync-indicator"></span>

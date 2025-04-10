@@ -81,7 +81,7 @@ document.addEventListener("DOMContentLoaded", () => {
     function createMonsterData(name, maxHp, isAdventurer) {
         // 创建临时ID，服务器端需要这个ID
         const tempId = Date.now().toString(36) + Math.random().toString(36).substring(2, 7);
-        
+
         // 创建基础数据对象，服务器端需要id字段
         return {
             id: tempId,
@@ -107,10 +107,13 @@ document.addEventListener("DOMContentLoaded", () => {
             setButtonsEnabled(true);
             socket.emit('join-session', sessionId);
             socket.emit('join-dice-session', { sessionId: sessionId, playerName: playerName });
-            
+
             // 移动到这里：确保WebSocket连接成功后再加载数据
             loadFromServer(true);
             loadDiceFromServer();
+
+            // 隐藏加载指示器
+            hideLoadingState();
         });
         socket.on('disconnect', () => {
             console.log('与服务器断开连接');
@@ -172,8 +175,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (progressBarContainer) {
                     progressBarContainer.style.display = "none";
                 }
-                addRollToHistory(playerName);
-                displayRollHistory(playerName);
+                // 确保 rollData 有效
+                if (rollData) {
+                    addRollToHistory(rollData);
+                    displayRollHistory(playerName);
+                }
                 document.getElementById("dice-result")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
             }
         });
@@ -192,11 +198,11 @@ document.addEventListener("DOMContentLoaded", () => {
         if (window.location.protocol !== 'https:' && !window.location.hostname.includes('localhost')) {
             console.warn('警告: 应用未在HTTPS下运行，这可能导致安全问题');
         }
-        
+
         // 确保全局函数和变量正确赋值
         window.saveToServer = saveToServer;
         window.confirmDialog = confirmDialog;
-        
+
         setButtonsEnabled(false);
         showLoadingState("正在连接到服务器...");
         updateSyncStatus("connecting", "正在连接");
@@ -204,10 +210,9 @@ document.addEventListener("DOMContentLoaded", () => {
         setupCopySessionLink();
         setupDiceEvents(socket, sessionId, playerName, saveDiceToServer);
         setupEventListeners();
-        
-        // 初始化战场
-        initBattlefield();
-        
+
+        // 战场功能已移除
+
         // Debounced functions for sending updates via WebSocket
         const debouncedSendHpUpdate = debounce((monsterId, currentHp, maxHp, tempHp) => {
             if (socket && socket.connected) {
@@ -234,7 +239,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (target.classList.contains("current-hp-input") || target.classList.contains("max-hp-input") || target.classList.contains("temp-hp-input")) {
                 // Update local HP bar immediately for responsiveness
                 updateHpBar(card);
-                
+
                 // Get all HP values from the card
                 const currentHp = card.querySelector(".current-hp-input").value;
                 const maxHp = card.querySelector(".max-hp-input").value;
@@ -243,7 +248,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 // Send debounced update via WebSocket
                 debouncedSendHpUpdate(monsterId, currentHp, maxHp, tempHp);
             }
-            
+
             // Handle Name input changes (using input event + debounce)
             if (target.classList.contains("monster-name")) {
                 const name = target.textContent;
@@ -267,7 +272,7 @@ document.addEventListener("DOMContentLoaded", () => {
             console.warn("loadFromServer 调用时 WebSocket 未连接");
             // WebSocket 连接成功后会自动请求
         }
-        
+
         /* 注释掉 fetch 调用，改用 WebSocket
         console.log("正在加载会话数据...");
         fetch(`${BATTLE_API_URL}/sessions/${sessionId}`, {
@@ -305,7 +310,7 @@ document.addEventListener("DOMContentLoaded", () => {
                  console.error("加载数据出错:", error);
                  updateSyncStatus("error", "加载失败");
                  // 显示错误信息，但不阻塞UI
-                 // hideLoadingState(); 
+                 // hideLoadingState();
                  showConnectionError(initializeApp); // 或者显示一个更通用的错误提示
             })
             .finally(() => {
@@ -382,7 +387,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const name = `${monsterNamePrefix.value} ${monsterCounter++}`;
             const maxHp = parseInt(defaultHpInput.value) || 100;
             // 创建怪物数据对象，但不立即添加到 DOM
-            const monsterData = createMonsterData(name, maxHp, false); 
+            const monsterData = createMonsterData(name, maxHp, false);
             if (monsterData) {
                  // 发送 add-monster 事件到服务器
                  if (socket && socket.connected) {
@@ -452,7 +457,7 @@ document.addEventListener("DOMContentLoaded", () => {
                  updateSyncStatus("success", "同步请求已发送");
             }, 1500);
         });
-        
+
         closeStatusBtn.addEventListener("click", () => statusSelector.classList.remove("active"));
         cancelStatusBtn.addEventListener("click", () => statusSelector.classList.remove("active"));
         applyStatusBtn.addEventListener("click", applySelectedStatus);
@@ -495,7 +500,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 loadDiceFromServer();
             }
         });
-        
+
         // 阻止菜单滑动问题
         const menuButtons = [
             document.getElementById("dice-btn"),
@@ -503,15 +508,15 @@ document.addEventListener("DOMContentLoaded", () => {
             document.getElementById("spells-btn"),
             document.getElementById("battlefield-btn")
         ];
-        
+
         menuButtons.forEach(btn => {
             if (btn) {
                 btn.addEventListener("click", (e) => {
                     e.preventDefault(); // 阻止默认行为
-                    
+
                     // 保存当前的滚动位置
                     const scrollPosition = window.scrollY;
-                    
+
                     // 延迟触发原有的点击功能，确保默认行为被阻止
                     setTimeout(() => {
                         // 每个按钮都有自己的点击处理，这里只防止滚动
@@ -519,10 +524,8 @@ document.addEventListener("DOMContentLoaded", () => {
                             document.getElementById("dice-dialog").classList.add("active");
                         } else if (btn.id === "items-btn") {
                             document.getElementById("items-dialog").classList.add("active");
-                        } else if (btn.id === "battlefield-btn") {
-                            openBattlefield();
                         }
-                        
+
                         // 恢复滚动位置
                         window.scrollTo({
                             top: scrollPosition,
@@ -532,7 +535,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 });
             }
         });
-        
+
         // 移除原有的点击事件处理（如果修改后的代码冲突）
         // 移除只能在后面添加了新的处理程序后执行
         if (diceBtn) diceBtn.removeEventListener("click", () => {
