@@ -24,6 +24,12 @@ function initBattlefield() {
     battlefieldContainer = document.getElementById('battlefield-container');
     battlefieldGrid = document.getElementById('battlefield-grid');
 
+    // 检查必要元素是否存在
+    if (!battlefield || !battlefieldContainer || !battlefieldGrid) {
+        console.warn('战场必要元素不存在，无法初始化战场');
+        return;
+    }
+
     // 设置事件监听器
     setupBattlefieldEventListeners();
 
@@ -47,68 +53,92 @@ function setupBattlefieldEventListeners() {
     const increasePieceSizeBtn = document.getElementById('increase-piece-size');
     const pieceSizeValue = document.getElementById('piece-size-value');
 
+    // 添加空值检查，防止在元素不存在时调用addEventListener
+
     // 关闭战场对话框
-    closeBattlefieldBtn.addEventListener('click', () => {
-        battlefield.classList.remove('active');
-        // 不再需要在这里保存状态，状态应实时通过 WebSocket 同步
-        // saveBattlefieldStateToServer();
-    });
+    if (closeBattlefieldBtn) {
+        closeBattlefieldBtn.addEventListener('click', () => {
+            battlefield.classList.remove('active');
+            // 不再需要在这里保存状态，状态应实时通过 WebSocket 同步
+            // saveBattlefieldStateToServer();
+        });
+    }
 
     // 上传背景图片
-    uploadBackgroundBtn.addEventListener('change', handleBackgroundUpload);
+    if (uploadBackgroundBtn) {
+        uploadBackgroundBtn.addEventListener('change', handleBackgroundUpload);
+    }
 
     // 缩放控制
-    zoomInBtn.addEventListener('click', () => {
-        updateBattlefieldScale(battlefieldScale + 0.1, true);
-    });
+    if (zoomInBtn) {
+        zoomInBtn.addEventListener('click', () => {
+            updateBattlefieldScale(battlefieldScale + 0.1, true);
+        });
+    }
 
-    zoomOutBtn.addEventListener('click', () => {
-        updateBattlefieldScale(battlefieldScale - 0.1, true);
-    });
+    if (zoomOutBtn) {
+        zoomOutBtn.addEventListener('click', () => {
+            updateBattlefieldScale(battlefieldScale - 0.1, true);
+        });
+    }
 
-    resetZoomBtn.addEventListener('click', () => {
-        updateBattlefieldScale(1.0, true);
-    });
+    if (resetZoomBtn) {
+        resetZoomBtn.addEventListener('click', () => {
+            updateBattlefieldScale(1.0, true);
+        });
+    }
 
     // 显示/隐藏方格
-    toggleGridBtn.addEventListener('click', () => {
-        isGridVisible = !isGridVisible;
-        updateGridVisibility(isGridVisible, true);
-        toggleGridBtn.textContent = isGridVisible ? '隐藏方格' : '显示方格';
-        toggleGridBtn.classList.toggle('active', !isGridVisible);
-    });
+    if (toggleGridBtn) {
+        toggleGridBtn.addEventListener('click', () => {
+            isGridVisible = !isGridVisible;
+            updateGridVisibility(isGridVisible, true);
+            toggleGridBtn.textContent = isGridVisible ? '隐藏方格' : '显示方格';
+            toggleGridBtn.classList.toggle('active', !isGridVisible);
+        });
+    }
 
     // 刷新战场
-    refreshBattlefieldBtn.addEventListener('click', () => {
-        console.log('手动刷新战场');
-        refreshBattlefield();
-        // 同时从服务器重新加载最新状态
-        loadBattlefieldStateFromServer();
-    });
+    if (refreshBattlefieldBtn) {
+        refreshBattlefieldBtn.addEventListener('click', () => {
+            console.log('手动刷新战场');
+            refreshBattlefield();
+            // 同时从服务器重新加载最新状态
+            loadBattlefieldStateFromServer();
+        });
+    }
 
     // 调整棋子大小
-    decreasePieceSizeBtn.addEventListener('click', () => {
-        updatePieceSize(pieceSize - 5, true);
-    });
+    if (decreasePieceSizeBtn) {
+        decreasePieceSizeBtn.addEventListener('click', () => {
+            updatePieceSize(pieceSize - 5, true);
+        });
+    }
 
-    increasePieceSizeBtn.addEventListener('click', () => {
-        updatePieceSize(pieceSize + 5, true);
-    });
+    if (increasePieceSizeBtn) {
+        increasePieceSizeBtn.addEventListener('click', () => {
+            updatePieceSize(pieceSize + 5, true);
+        });
+    }
 
     // 鼠标滚轮缩放
-    battlefieldContainer.addEventListener('wheel', handleMouseWheel);
+    if (battlefieldContainer) {
+        battlefieldContainer.addEventListener('wheel', handleMouseWheel);
 
-    // 触摸事件处理
-    if (isTouchDevice) {
-        battlefieldContainer.addEventListener('touchstart', handleTouchStart, { passive: false });
-        battlefieldContainer.addEventListener('touchmove', handleTouchMove, { passive: false });
-        battlefieldContainer.addEventListener('touchend', handleTouchEnd);
+        // 触摸事件处理
+        if (isTouchDevice) {
+            battlefieldContainer.addEventListener('touchstart', handleTouchStart, { passive: false });
+            battlefieldContainer.addEventListener('touchmove', handleTouchMove, { passive: false });
+            battlefieldContainer.addEventListener('touchend', handleTouchEnd);
+        }
     }
 
     // 鼠标拖动事件
-    battlefieldGrid.addEventListener('mousedown', handleMouseDown);
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+    if (battlefieldGrid) {
+        battlefieldGrid.addEventListener('mousedown', handleMouseDown);
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+    }
 
     // 移除 beforeunload 中的保存调用
     window.removeEventListener('beforeunload', saveBattlefieldStateToServer); // 移除旧监听器
@@ -122,71 +152,80 @@ function setupBattlefieldEventListeners() {
 
 // 设置Socket.io事件
 function setupBattlefieldSocketEvents() {
-    if (!window.socket) return;
+    if (!window.socket) {
+        console.warn('无法设置战场Socket事件：Socket不存在');
+        return;
+    }
 
-    // 监听棋子移动事件
-    window.socket.on('piece-moved', (data) => {
-        if (data && data.pieceId && data.x !== undefined && data.y !== undefined) {
-            updatePiecePosition(data.pieceId, data.x, data.y, false);
-        }
-    });
-
-    // 监听背景图片更新事件
-    window.socket.on('background-updated', (data) => {
-        if (data && data.imageUrl) {
-            updateBackgroundImage(data.imageUrl, false);
-        }
-    });
-
-    // 监听分块图片传输完成事件
-    window.socket.on('background-transfer-complete', (data) => {
-        if (data && data.imageUrl) {
-            console.log('接收到完整的背景图片');
-            updateBackgroundImage(data.imageUrl, false);
-        }
-    });
-
-    // 监听缩放更新事件
-    window.socket.on('scale-updated', (data) => {
-        if (data && data.scale !== undefined) {
-            updateBattlefieldScale(data.scale, false);
-        }
-    });
-
-    // 监听方格显示/隐藏事件
-    window.socket.on('grid-visibility-updated', (data) => {
-        if (data && data.isVisible !== undefined) {
-            updateGridVisibility(data.isVisible, false);
-            const toggleGridBtn = document.getElementById('toggle-grid');
-            toggleGridBtn.textContent = data.isVisible ? '隐藏方格' : '显示方格';
-            toggleGridBtn.classList.toggle('active', !data.isVisible);
-        }
-    });
-
-    // 监听棋子大小更新事件
-    window.socket.on('piece-size-updated', (data) => {
-        if (data && data.size !== undefined) {
-            updatePieceSize(data.size, false);
-        }
-    });
-
-    // 监听战场状态更新事件
-    window.socket.on('battlefield-state-updated', (data) => {
-        if (data && data.state) {
-            // 记录当前棋子数量
-            const currentPieceCount = Object.keys(battlefieldPieces).length;
-
-            // 加载新状态
-            loadBattlefieldState(data.state);
-
-            // 检查是否有新棋子被创建
-            const newPieceCount = Object.keys(battlefieldPieces).length;
-            if (newPieceCount > currentPieceCount) {
-                // 显示通知
-                showBattlefieldNotification(`自动创建了 ${newPieceCount - currentPieceCount} 个新棋子`);
+    try {
+        // 监听棋子移动事件
+        window.socket.on('piece-moved', (data) => {
+            if (data && data.pieceId && data.x !== undefined && data.y !== undefined) {
+                updatePiecePosition(data.pieceId, data.x, data.y, false);
             }
-        }
-    });
+        });
+
+        // 监听背景图片更新事件
+        window.socket.on('background-updated', (data) => {
+            if (data && data.imageUrl) {
+                updateBackgroundImage(data.imageUrl, false);
+            }
+        });
+
+        // 监听分块图片传输完成事件
+        window.socket.on('background-transfer-complete', (data) => {
+            if (data && data.imageUrl) {
+                console.log('接收到完整的背景图片');
+                updateBackgroundImage(data.imageUrl, false);
+            }
+        });
+
+        // 监听缩放更新事件
+        window.socket.on('scale-updated', (data) => {
+            if (data && data.scale !== undefined) {
+                updateBattlefieldScale(data.scale, false);
+            }
+        });
+
+        // 监听方格显示/隐藏事件
+        window.socket.on('grid-visibility-updated', (data) => {
+            if (data && data.isVisible !== undefined) {
+                updateGridVisibility(data.isVisible, false);
+                const toggleGridBtn = document.getElementById('toggle-grid');
+                if (toggleGridBtn) {
+                    toggleGridBtn.textContent = data.isVisible ? '隐藏方格' : '显示方格';
+                    toggleGridBtn.classList.toggle('active', !data.isVisible);
+                }
+            }
+        });
+
+        // 监听棋子大小更新事件
+        window.socket.on('piece-size-updated', (data) => {
+            if (data && data.size !== undefined) {
+                updatePieceSize(data.size, false);
+            }
+        });
+
+        // 监听战场状态更新事件
+        window.socket.on('battlefield-state-updated', (data) => {
+            if (data && data.state) {
+                // 记录当前棋子数量
+                const currentPieceCount = Object.keys(battlefieldPieces).length;
+
+                // 加载新状态
+                loadBattlefieldState(data.state);
+
+                // 检查是否有新棋子被创建
+                const newPieceCount = Object.keys(battlefieldPieces).length;
+                if (newPieceCount > currentPieceCount) {
+                    // 显示通知
+                    showBattlefieldNotification(`自动创建了 ${newPieceCount - currentPieceCount} 个新棋子`);
+                }
+            }
+        });
+    } catch (error) {
+        console.error('设置战场Socket事件时出错:', error);
+    }
 
     // 添加一个简单的通知函数
     function showBattlefieldNotification(message) {
@@ -215,234 +254,314 @@ function setupBattlefieldSocketEvents() {
 
 // 打开战场对话框
 function openBattlefield() {
+    if (!battlefield) {
+        console.warn('战场元素不存在，无法打开战场');
+        return;
+    }
+
     battlefield.classList.add('active');
     refreshBattlefield();
 }
 
 // 刷新战场
 function refreshBattlefield() {
-    // 显示加载指示器
-    const loadingIndicator = document.createElement('div');
-    loadingIndicator.className = 'battlefield-loading';
-    loadingIndicator.innerHTML = '正在加载战场...';
-    loadingIndicator.style.position = 'absolute';
-    loadingIndicator.style.top = '50%';
-    loadingIndicator.style.left = '50%';
-    loadingIndicator.style.transform = 'translate(-50%, -50%)';
-    loadingIndicator.style.background = 'rgba(0, 0, 0, 0.7)';
-    loadingIndicator.style.color = 'white';
-    loadingIndicator.style.padding = '10px 20px';
-    loadingIndicator.style.borderRadius = '5px';
-    loadingIndicator.style.zIndex = '1000';
-    battlefieldContainer.appendChild(loadingIndicator);
+    // 检查必要元素是否存在
+    if (!battlefieldContainer || !battlefieldGrid) {
+        console.warn('战场必要元素不存在，无法刷新战场');
+        return;
+    }
 
-    // 清空当前棋子
-    battlefieldGrid.innerHTML = '';
-    battlefieldPieces = {};
+    try {
+        // 显示加载指示器
+        const loadingIndicator = document.createElement('div');
+        loadingIndicator.className = 'battlefield-loading';
+        loadingIndicator.innerHTML = '正在加载战场...';
+        loadingIndicator.style.position = 'absolute';
+        loadingIndicator.style.top = '50%';
+        loadingIndicator.style.left = '50%';
+        loadingIndicator.style.transform = 'translate(-50%, -50%)';
+        loadingIndicator.style.background = 'rgba(0, 0, 0, 0.7)';
+        loadingIndicator.style.color = 'white';
+        loadingIndicator.style.padding = '10px 20px';
+        loadingIndicator.style.borderRadius = '5px';
+        loadingIndicator.style.zIndex = '1000';
+        battlefieldContainer.appendChild(loadingIndicator);
 
-    // 获取所有冒险者和怪物卡片
-    const monsterCards = document.querySelectorAll('.monster-card');
+        // 清空当前棋子
+        battlefieldGrid.innerHTML = '';
+        battlefieldPieces = {};
 
-    // 为每个卡片创建对应的棋子
-    monsterCards.forEach((card, index) => {
-        const isAdventurer = card.dataset.type === 'adventurer';
-        const name = card.querySelector('.monster-name').textContent;
-        const id = card.dataset.id;
-        const currentHp = card.querySelector('.current-hp-input').value;
-        const maxHp = card.querySelector('.max-hp-input').value;
+        // 获取所有冒险者和怪物卡片
+        const monsterCards = document.querySelectorAll('.monster-card');
 
-        // 创建棋子
-        createBattlefieldPiece(id, name, isAdventurer, currentHp, maxHp, index);
-    });
+        // 为每个卡片创建对应的棋子
+        monsterCards.forEach((card, index) => {
+            const isAdventurer = card.dataset.type === 'adventurer';
+            const nameElement = card.querySelector('.monster-name');
+            const currentHpElement = card.querySelector('.current-hp-input');
+            const maxHpElement = card.querySelector('.max-hp-input');
 
-    // 检查battlefieldState是否为空，如果为空则尝试从服务器加载
-    if (Object.keys(battlefieldState).length === 0) {
-        loadBattlefieldStateFromServer();
-        // 延迟一点时间等待加载完成
-        setTimeout(() => {
+            if (!nameElement || !currentHpElement || !maxHpElement) {
+                console.warn(`卡片 ${index} 缺少必要元素，跳过创建棋子`);
+                return;
+            }
+
+            const name = nameElement.textContent;
+            const id = card.dataset.id;
+            const currentHp = currentHpElement.value;
+            const maxHp = maxHpElement.value;
+
+            // 创建棋子
+            createBattlefieldPiece(id, name, isAdventurer, currentHp, maxHp, index);
+        });
+
+        // 检查battlefieldState是否为空，如果为空则尝试从服务器加载
+        if (!battlefieldState || Object.keys(battlefieldState).length === 0) {
+            loadBattlefieldStateFromServer();
+            // 延迟一点时间等待加载完成
+            setTimeout(() => {
+                applyBattlefieldState();
+                // 移除加载指示器
+                if (loadingIndicator.parentNode) {
+                    loadingIndicator.parentNode.removeChild(loadingIndicator);
+                }
+            }, 1000);
+        } else {
+            // 应用已有的战场状态
             applyBattlefieldState();
             // 移除加载指示器
-            if (loadingIndicator.parentNode) {
-                loadingIndicator.parentNode.removeChild(loadingIndicator);
-            }
-        }, 1000);
-    } else {
-        // 应用已有的战场状态
-        applyBattlefieldState();
-        // 移除加载指示器
-        setTimeout(() => {
-            if (loadingIndicator.parentNode) {
-                loadingIndicator.parentNode.removeChild(loadingIndicator);
-            }
-        }, 500);
+            setTimeout(() => {
+                if (loadingIndicator.parentNode) {
+                    loadingIndicator.parentNode.removeChild(loadingIndicator);
+                }
+            }, 500);
+        }
+    } catch (error) {
+        console.error('刷新战场时出错:', error);
     }
 }
 
 // 创建战场棋子
 function createBattlefieldPiece(id, name, isAdventurer, currentHp, maxHp, index) {
-    const piece = document.createElement('div');
-    piece.className = 'battlefield-piece';
-    piece.dataset.id = id;
-    piece.dataset.type = isAdventurer ? 'adventurer' : 'monster';
-
-    // 设置棋子颜色
-    const color = isAdventurer ?
-        `hsl(${(index * 60) % 360}, 70%, 60%)` :
-        `hsl(${(index * 40 + 180) % 360}, 70%, 40%)`;
-
-    piece.style.backgroundColor = color;
-
-    // 设置棋子内容
-    piece.innerHTML = `
-        <div class="piece-name">${name}</div>
-        <div class="piece-hp">${currentHp}/${maxHp}</div>
-    `;
-
-    // 从保存的状态中获取位置，如果没有则使用默认位置
-    let x = (index % 10) * gridSize + 50;
-    let y = Math.floor(index / 10) * gridSize + 50;
-
-    // 如果有保存的位置，使用保存的位置
-    if (battlefieldState.pieces && battlefieldState.pieces[id]) {
-        x = battlefieldState.pieces[id].x || x;
-        y = battlefieldState.pieces[id].y || y;
+    if (!battlefieldGrid) {
+        console.warn('战场网格元素不存在，无法创建棋子');
+        return;
     }
 
-    piece.style.left = `${x}px`;
-    piece.style.top = `${y}px`;
+    if (!id || !name) {
+        console.warn('棋子ID或名称不存在，无法创建棋子');
+        return;
+    }
 
-    // 设置棋子大小
-    piece.style.width = `${pieceSize}px`;
-    piece.style.height = `${pieceSize}px`;
+    try {
+        const piece = document.createElement('div');
+        piece.className = 'battlefield-piece';
+        piece.dataset.id = id;
+        piece.dataset.type = isAdventurer ? 'adventurer' : 'monster';
 
-    // 存储棋子信息
-    battlefieldPieces[id] = {
-        element: piece,
-        x: x,
-        y: y,
-        name: name,
-        isAdventurer: isAdventurer,
-        currentHp: currentHp,
-        maxHp: maxHp
-    };
+        // 设置棋子颜色
+        const color = isAdventurer ?
+            `hsl(${(index * 60) % 360}, 70%, 60%)` :
+            `hsl(${(index * 40 + 180) % 360}, 70%, 40%)`;
 
-    // 添加到战场
-    battlefieldGrid.appendChild(piece);
+        piece.style.backgroundColor = color;
+
+        // 设置棋子内容
+        piece.innerHTML = `
+            <div class="piece-name">${name}</div>
+            <div class="piece-hp">${currentHp}/${maxHp}</div>
+        `;
+
+        // 从保存的状态中获取位置，如果没有则使用默认位置
+        let x = (index % 10) * gridSize + 50;
+        let y = Math.floor(index / 10) * gridSize + 50;
+
+        // 如果有保存的位置，使用保存的位置
+        if (battlefieldState && battlefieldState.pieces && battlefieldState.pieces[id]) {
+            x = battlefieldState.pieces[id].x || x;
+            y = battlefieldState.pieces[id].y || y;
+        }
+
+        piece.style.left = `${x}px`;
+        piece.style.top = `${y}px`;
+
+        // 设置棋子大小
+        piece.style.width = `${pieceSize}px`;
+        piece.style.height = `${pieceSize}px`;
+
+        // 存储棋子信息
+        battlefieldPieces[id] = {
+            element: piece,
+            x: x,
+            y: y,
+            name: name,
+            isAdventurer: isAdventurer,
+            currentHp: currentHp,
+            maxHp: maxHp
+        };
+
+        // 添加到战场
+        battlefieldGrid.appendChild(piece);
+    } catch (error) {
+        console.error('创建棋子时出错:', error);
+    }
 }
 
 // 更新棋子位置
 function updatePiecePosition(pieceId, x, y, emitEvent = true) {
+    if (!pieceId || x === undefined || y === undefined) {
+        console.warn('棋子ID或位置不存在，无法更新棋子位置');
+        return;
+    }
+
     const piece = battlefieldPieces[pieceId];
-    if (!piece) return;
+    if (!piece || !piece.element) {
+        console.warn(`棋子 ${pieceId} 不存在或元素不存在，无法更新位置`);
+        return;
+    }
 
-    // 更新位置
-    piece.x = x;
-    piece.y = y;
-    piece.element.style.left = `${x}px`;
-    piece.element.style.top = `${y}px`;
+    try {
+        // 更新位置
+        piece.x = x;
+        piece.y = y;
+        piece.element.style.left = `${x}px`;
+        piece.element.style.top = `${y}px`;
 
-    // 更新战场状态
-    if (!battlefieldState.pieces) battlefieldState.pieces = {};
-    battlefieldState.pieces[pieceId] = battlefieldState.pieces[pieceId] || {};
-    battlefieldState.pieces[pieceId].x = x;
-    battlefieldState.pieces[pieceId].y = y;
+        // 更新战场状态
+        if (!battlefieldState) battlefieldState = {};
+        if (!battlefieldState.pieces) battlefieldState.pieces = {};
+        battlefieldState.pieces[pieceId] = battlefieldState.pieces[pieceId] || {};
+        battlefieldState.pieces[pieceId].x = x;
+        battlefieldState.pieces[pieceId].y = y;
 
-    // 发送事件到服务器
-    if (emitEvent && window.socket && window.socket.connected) {
-         console.log(`Emitting move-piece for ${pieceId} to x:${x}, y:${y}`);
-        window.socket.emit('move-piece', {
-            sessionId: window.sessionId,
-            pieceId: pieceId,
-            x: x,
-            y: y
-        });
-         // 不再需要在这里调用 saveBattlefieldStateToServer
-        // debounce(saveBattlefieldStateToServer, 1000)();
+        // 发送事件到服务器
+        if (emitEvent && window.socket && window.socket.connected && window.sessionId) {
+            console.log(`Emitting move-piece for ${pieceId} to x:${x}, y:${y}`);
+            window.socket.emit('move-piece', {
+                sessionId: window.sessionId,
+                pieceId: pieceId,
+                x: x,
+                y: y
+            });
+            // 不再需要在这里调用 saveBattlefieldStateToServer
+            // debounce(saveBattlefieldStateToServer, 1000)();
+        }
+    } catch (error) {
+        console.error(`更新棋子 ${pieceId} 位置时出错:`, error);
     }
 }
 
 // 更新战场缩放
 function updateBattlefieldScale(scale, emitEvent = true) {
-    scale = Math.max(0.5, Math.min(3.0, scale));
-    if (battlefieldScale === scale) return; // 如果没有变化则不执行
+    if (!battlefieldGrid) {
+        console.warn('战场网格元素不存在，无法更新缩放');
+        return;
+    }
 
-    battlefieldScale = scale;
-    battlefieldGrid.style.transform = `scale(${scale})`;
+    try {
+        scale = Math.max(0.5, Math.min(3.0, scale));
+        if (battlefieldScale === scale) return; // 如果没有变化则不执行
 
-    // 更新本地战场状态
-    battlefieldState.scale = scale;
+        battlefieldScale = scale;
+        battlefieldGrid.style.transform = `scale(${scale})`;
 
-    // 发送事件到服务器
-    if (emitEvent && window.socket && window.socket.connected) {
-         console.log(`Emitting update-scale: ${scale}`);
-        window.socket.emit('update-scale', {
-            sessionId: window.sessionId,
-            scale: scale
-        });
-         // 不再需要在这里调用 saveBattlefieldStateToServer
-        // debounce(saveBattlefieldStateToServer, 1000)();
+        // 更新本地战场状态
+        if (!battlefieldState) battlefieldState = {};
+        battlefieldState.scale = scale;
+
+        // 发送事件到服务器
+        if (emitEvent && window.socket && window.socket.connected && window.sessionId) {
+            console.log(`Emitting update-scale: ${scale}`);
+            window.socket.emit('update-scale', {
+                sessionId: window.sessionId,
+                scale: scale
+            });
+            // 不再需要在这里调用 saveBattlefieldStateToServer
+            // debounce(saveBattlefieldStateToServer, 1000)();
+        }
+    } catch (error) {
+        console.error('更新战场缩放时出错:', error);
     }
 }
 
 // 更新方格显示/隐藏
 function updateGridVisibility(isVisible, emitEvent = true) {
-    if (isGridVisible === isVisible) return; // 如果没有变化则不执行
-
-    isGridVisible = isVisible;
-
-    // 应用方格显示/隐藏
-    if (isVisible) {
-        battlefieldGrid.classList.remove('hide-grid');
-    } else {
-        battlefieldGrid.classList.add('hide-grid');
+    if (!battlefieldGrid) {
+        console.warn('战场网格元素不存在，无法更新方格显示/隐藏');
+        return;
     }
 
-    // 更新战场状态
-    battlefieldState.isGridVisible = isVisible;
+    try {
+        if (isGridVisible === isVisible) return; // 如果没有变化则不执行
 
-    // 发送事件到服务器
-    if (emitEvent && window.socket && window.socket.connected) {
-         console.log(`Emitting update-grid-visibility: ${isVisible}`);
-        window.socket.emit('update-grid-visibility', {
-            sessionId: window.sessionId,
-            isVisible: isVisible
-        });
-         // 不再需要在这里调用 saveBattlefieldStateToServer
-        // debounce(saveBattlefieldStateToServer, 1000)();
+        isGridVisible = isVisible;
+
+        // 应用方格显示/隐藏
+        if (isVisible) {
+            battlefieldGrid.classList.remove('hide-grid');
+        } else {
+            battlefieldGrid.classList.add('hide-grid');
+        }
+
+        // 更新战场状态
+        if (!battlefieldState) battlefieldState = {};
+        battlefieldState.isGridVisible = isVisible;
+
+        // 发送事件到服务器
+        if (emitEvent && window.socket && window.socket.connected && window.sessionId) {
+            console.log(`Emitting update-grid-visibility: ${isVisible}`);
+            window.socket.emit('update-grid-visibility', {
+                sessionId: window.sessionId,
+                isVisible: isVisible
+            });
+            // 不再需要在这里调用 saveBattlefieldStateToServer
+            // debounce(saveBattlefieldStateToServer, 1000)();
+        }
+    } catch (error) {
+        console.error('更新方格显示/隐藏时出错:', error);
     }
 }
 
 // 更新棋子大小
 function updatePieceSize(size, emitEvent = true) {
-    size = Math.max(20, Math.min(80, size));
-     if (pieceSize === size) return; // 如果没有变化则不执行
+    try {
+        size = Math.max(20, Math.min(80, size));
+        if (pieceSize === size) return; // 如果没有变化则不执行
 
-    pieceSize = size;
+        pieceSize = size;
 
-    // 更新显示的大小值
-    const pieceSizeValue = document.getElementById('piece-size-value');
-    if (pieceSizeValue) {
-        pieceSizeValue.textContent = `${size}px`;
-    }
+        // 更新显示的大小值
+        const pieceSizeValue = document.getElementById('piece-size-value');
+        if (pieceSizeValue) {
+            pieceSizeValue.textContent = `${size}px`;
+        }
 
-    // 应用棋子大小
-    Object.values(battlefieldPieces).forEach(piece => {
-        piece.element.style.width = `${size}px`;
-        piece.element.style.height = `${size}px`;
-    });
+        // 应用棋子大小
+        if (battlefieldPieces) {
+            Object.values(battlefieldPieces).forEach(piece => {
+                if (piece && piece.element) {
+                    piece.element.style.width = `${size}px`;
+                    piece.element.style.height = `${size}px`;
+                }
+            });
+        }
 
-    // 更新战场状态
-    battlefieldState.pieceSize = size;
+        // 更新战场状态
+        if (!battlefieldState) battlefieldState = {};
+        battlefieldState.pieceSize = size;
 
-    // 发送事件到服务器
-    if (emitEvent && window.socket && window.socket.connected) {
-         console.log(`Emitting update-piece-size: ${size}`);
-        window.socket.emit('update-piece-size', {
-            sessionId: window.sessionId,
-            size: size
-        });
-         // 不再需要在这里调用 saveBattlefieldStateToServer
-        // debounce(saveBattlefieldStateToServer, 1000)();
+        // 发送事件到服务器
+        if (emitEvent && window.socket && window.socket.connected && window.sessionId) {
+            console.log(`Emitting update-piece-size: ${size}`);
+            window.socket.emit('update-piece-size', {
+                sessionId: window.sessionId,
+                size: size
+            });
+            // 不再需要在这里调用 saveBattlefieldStateToServer
+            // debounce(saveBattlefieldStateToServer, 1000)();
+        }
+    } catch (error) {
+        console.error('更新棋子大小时出错:', error);
     }
 }
 
@@ -794,48 +913,62 @@ function updatePieceName(pieceId, name) {
 
 // 应用战场状态
 function applyBattlefieldState() {
-    if (Object.keys(battlefieldState).length === 0) return;
-
-    // 应用背景图片
-    if (battlefieldState.backgroundImage) {
-        updateBackgroundImage(battlefieldState.backgroundImage, false);
+    if (!battlefieldState || Object.keys(battlefieldState).length === 0) {
+        console.warn('战场状态为空，无法应用');
+        return;
     }
 
-    // 应用方格显示/隐藏状态
-    if (battlefieldState.isGridVisible !== undefined) {
-        updateGridVisibility(battlefieldState.isGridVisible, false);
-        const toggleGridBtn = document.getElementById('toggle-grid');
-        if (toggleGridBtn) {
-            toggleGridBtn.textContent = battlefieldState.isGridVisible ? '隐藏方格' : '显示方格';
-            toggleGridBtn.classList.toggle('active', !battlefieldState.isGridVisible);
+    try {
+        // 应用背景图片
+        if (battlefieldState.backgroundImage) {
+            updateBackgroundImage(battlefieldState.backgroundImage, false);
         }
-    }
 
-    // 应用棋子大小
-    if (battlefieldState.pieceSize) {
-        updatePieceSize(battlefieldState.pieceSize, false);
-    }
-
-    // 应用棋子位置
-    if (battlefieldState.pieces) {
-        Object.keys(battlefieldState.pieces).forEach(pieceId => {
-            const pieceData = battlefieldState.pieces[pieceId];
-            if (battlefieldPieces[pieceId] && pieceData.x !== undefined && pieceData.y !== undefined) {
-                updatePiecePosition(pieceId, pieceData.x, pieceData.y, false);
+        // 应用方格显示/隐藏状态
+        if (battlefieldState.isGridVisible !== undefined) {
+            updateGridVisibility(battlefieldState.isGridVisible, false);
+            const toggleGridBtn = document.getElementById('toggle-grid');
+            if (toggleGridBtn) {
+                toggleGridBtn.textContent = battlefieldState.isGridVisible ? '隐藏方格' : '显示方格';
+                toggleGridBtn.classList.toggle('active', !battlefieldState.isGridVisible);
             }
-        });
+        }
+
+        // 应用棋子大小
+        if (battlefieldState.pieceSize) {
+            updatePieceSize(battlefieldState.pieceSize, false);
+        }
+
+        // 应用棋子位置
+        if (battlefieldState.pieces) {
+            Object.keys(battlefieldState.pieces).forEach(pieceId => {
+                const pieceData = battlefieldState.pieces[pieceId];
+                if (battlefieldPieces[pieceId] && pieceData.x !== undefined && pieceData.y !== undefined) {
+                    updatePiecePosition(pieceId, pieceData.x, pieceData.y, false);
+                }
+            });
+        }
+    } catch (error) {
+        console.error('应用战场状态时出错:', error);
     }
 }
 
 // 从服务器加载战场状态
 function loadBattlefieldStateFromServer() {
-    if (!window.socket || !window.sessionId) return;
+    if (!window.socket || !window.sessionId) {
+        console.warn('无法加载战场状态：Socket或会话 ID 不存在');
+        return;
+    }
 
-    // 请求最新的战场状态 (保持不变)
-    console.log("Requesting latest battlefield state via WebSocket...");
-    window.socket.emit('request-latest-battlefield-state', { // 使用新的事件名
-        sessionId: window.sessionId
-    });
+    try {
+        // 请求最新的战场状态 (保持不变)
+        console.log("Requesting latest battlefield state via WebSocket...");
+        window.socket.emit('request-latest-battlefield-state', { // 使用新的事件名
+            sessionId: window.sessionId
+        });
+    } catch (error) {
+        console.error('请求战场状态时出错:', error);
+    }
 }
 
 // 加载战场状态
