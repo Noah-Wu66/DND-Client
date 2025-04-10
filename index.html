@@ -164,7 +164,7 @@
             <div id="dice-result" class="result-display"></div>
         </div>
     </div>
-    
+
     <!-- 物品查询对话框 -->
     <div class="items-dialog" id="items-dialog">
         <div class="items-panel">
@@ -189,7 +189,7 @@
                             <option value="法杖">法杖</option>
                             <option value="奇物">奇物</option>
                         </select>
-                        
+
                         <label for="rarity">稀有度:</label>
                         <select id="rarity">
                             <option value="all">全部</option>
@@ -200,7 +200,7 @@
                             <option value="传说">传说</option>
                             <option value="神器">神器</option>
                         </select>
-                        
+
                         <label for="attunement">同调:</label>
                         <select id="attunement">
                             <option value="all">全部</option>
@@ -208,12 +208,12 @@
                             <option value="不需要">不需要</option>
                         </select>
                     </div>
-                    
+
                     <div class="search-box">
                         <input type="text" id="search-input" placeholder="输入物品名称搜索...">
                         <button id="search-button">搜索</button>
                     </div>
-                    
+
                     <div class="buttons">
                         <button id="draw-1">抽取1个</button>
                         <button id="draw-5">抽取5个</button>
@@ -223,13 +223,13 @@
                     </div>
                 </div>
             </div>
-            
+
             <div id="item-results" class="results">
                 <p>请选择筛选条件并点击抽取按钮，或使用搜索功能查找特定物品。</p>
             </div>
         </div>
     </div>
-    
+
     <!-- 战场对话框 -->
     <div class="battlefield-dialog" id="battlefield-dialog">
         <div class="battlefield-panel">
@@ -247,6 +247,7 @@
                     <button id="zoom-out" class="zoom-btn">缩小</button>
                     <button id="reset-zoom" class="zoom-btn">重置缩放</button>
                     <button id="toggle-grid" class="toggle-btn">隐藏方格</button>
+                    <button id="refresh-battlefield" class="toggle-btn">刷新战场</button>
                     <div class="piece-size-control">
                         <span>棋子大小:</span>
                         <button id="decrease-piece-size" class="size-btn">-</button>
@@ -262,7 +263,7 @@
             </div>
         </div>
     </div>
-    
+
     <div id="sync-status">
         <span class="sync-indicator"></span>
         <span class="sync-text">已同步</span>
