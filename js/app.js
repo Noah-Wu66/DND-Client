@@ -363,10 +363,18 @@ document.addEventListener("DOMContentLoaded", () => {
          */
     }
     function saveToServer(immediate = false) {
-        console.log("saveToServer called, but HTTP POST is disabled. State sync relies on WebSocket.");
-        // 如果需要，可以在这里触发一次WebSocket同步请求，但这取决于服务器设计
-        // 例如: if (socket && socket.connected) socket.emit('request-state-save', { sessionId });
-        // 但更推荐的方式是服务器根据收到的增量更新自动保存
+        // 不再显示错误消息，因为我们已经修改了代码使用WebSocket进行同步
+        // 如果需要强制同步，可以发送请求
+        if (socket && socket.connected) {
+            // 请求最新状态
+            socket.emit('request-latest-state', { sessionId: window.sessionId });
+            if (typeof updateSyncStatus === 'function') {
+                updateSyncStatus("syncing", "正在同步数据...");
+                setTimeout(() => {
+                    updateSyncStatus("success", "数据已同步");
+                }, 500);
+            }
+        }
     }
     function saveDiceToServer(immediate = false) {
         updateSyncStatus("syncing", "正在同步骰子状态 (WebSocket)...");

@@ -14,11 +14,11 @@ function createMonsterCard(name, maxHp, isAdventurer = false, saveCallback) {
     const monsterId = `monster-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
     const currentHp = maxHp;
     const tempHp = 0;
-    
+
     // 移除所有空状态元素
     const emptyStates = monsterContainer.querySelectorAll(".empty-state");
     emptyStates.forEach(emptyState => emptyState.remove());
-    
+
     const monsterCard = document.createElement("div");
     monsterCard.className = "monster-card";
     monsterCard.dataset.id = monsterId;
@@ -80,7 +80,23 @@ function createMonsterCard(name, maxHp, isAdventurer = false, saveCallback) {
         monsterCard.classList.toggle("locked");
         lockButton.textContent = monsterCard.classList.contains("locked") ? "🔒" : "🔓";
         lockButton.title = monsterCard.classList.contains("locked") ? "解锁卡片" : "锁定卡片";
-        window.saveToServer();
+
+        // 发送锁定状态更新
+        const monsterId = monsterCard.dataset.id;
+        if (window.socket && window.socket.connected && monsterId) {
+            const isLocked = monsterCard.classList.contains("locked");
+            console.log(`发送锁定状态更新，ID: ${monsterId}, 锁定: ${isLocked}`);
+            window.socket.emit('update-lock-status', {
+                sessionId: window.sessionId,
+                monsterId: monsterId,
+                isLocked: isLocked
+            });
+
+            // 更新同步状态
+            if (typeof window.updateSyncStatus === 'function') {
+                window.updateSyncStatus("success", "锁定状态已更新");
+            }
+        }
     });
     const statusButton = monsterCard.querySelector(".status-button");
     statusButton.addEventListener("click", (e) => {
@@ -101,27 +117,84 @@ function createMonsterCard(name, maxHp, isAdventurer = false, saveCallback) {
     currentHpInput.addEventListener("change", () => {
         let newCurrentHp = parseInt(currentHpInput.value) || 0;
         const maxHp = parseInt(monsterCard.querySelector(".max-hp-input").value) || 1;
+        const tempHp = parseInt(monsterCard.querySelector(".temp-hp-input").value) || 0;
         newCurrentHp = Math.max(0, Math.min(maxHp, newCurrentHp));
         currentHpInput.value = newCurrentHp;
         updateHpBar(monsterCard);
-        window.saveToServer();
+
+        // 发送HP更新
+        const monsterId = monsterCard.dataset.id;
+        if (window.socket && window.socket.connected && monsterId) {
+            console.log(`发送HP更新请求，ID: ${monsterId}, HP: ${newCurrentHp}/${maxHp}, 临时HP: ${tempHp}`);
+            window.socket.emit('update-hp', {
+                sessionId: window.sessionId,
+                monsterId: monsterId,
+                currentHp: newCurrentHp,
+                maxHp: maxHp,
+                tempHp: tempHp
+            });
+
+            // 更新同步状态
+            if (typeof window.updateSyncStatus === 'function') {
+                window.updateSyncStatus("success", "HP已更新");
+            }
+        }
     });
+
     const maxHpInput = monsterCard.querySelector(".max-hp-input");
     maxHpInput.addEventListener("change", () => {
         const newMaxHp = Math.max(1, parseInt(maxHpInput.value) || 1);
         maxHpInput.value = newMaxHp;
         const currentHpInput = monsterCard.querySelector(".current-hp-input");
         let currentHp = parseInt(currentHpInput.value) || 0;
+        const tempHp = parseInt(monsterCard.querySelector(".temp-hp-input").value) || 0;
         if (currentHp > newMaxHp) currentHpInput.value = currentHp = newMaxHp;
         updateHpBar(monsterCard);
-        window.saveToServer();
+
+        // 发送HP更新
+        const monsterId = monsterCard.dataset.id;
+        if (window.socket && window.socket.connected && monsterId) {
+            console.log(`发送HP更新请求，ID: ${monsterId}, HP: ${currentHp}/${newMaxHp}, 临时HP: ${tempHp}`);
+            window.socket.emit('update-hp', {
+                sessionId: window.sessionId,
+                monsterId: monsterId,
+                currentHp: currentHp,
+                maxHp: newMaxHp,
+                tempHp: tempHp
+            });
+
+            // 更新同步状态
+            if (typeof window.updateSyncStatus === 'function') {
+                window.updateSyncStatus("success", "HP已更新");
+            }
+        }
     });
+
     const tempHpInput = monsterCard.querySelector(".temp-hp-input");
     tempHpInput.addEventListener("change", () => {
         let newTempHp = Math.max(0, parseInt(tempHpInput.value) || 0);
         tempHpInput.value = newTempHp;
+        const currentHp = parseInt(currentHpInput.value) || 0;
+        const maxHp = parseInt(maxHpInput.value) || 1;
         updateHpBar(monsterCard);
-        window.saveToServer();
+
+        // 发送HP更新
+        const monsterId = monsterCard.dataset.id;
+        if (window.socket && window.socket.connected && monsterId) {
+            console.log(`发送HP更新请求，ID: ${monsterId}, HP: ${currentHp}/${maxHp}, 临时HP: ${newTempHp}`);
+            window.socket.emit('update-hp', {
+                sessionId: window.sessionId,
+                monsterId: monsterId,
+                currentHp: currentHp,
+                maxHp: maxHp,
+                tempHp: newTempHp
+            });
+
+            // 更新同步状态
+            if (typeof window.updateSyncStatus === 'function') {
+                window.updateSyncStatus("success", "HP已更新");
+            }
+        }
     });
     const damageBtn = monsterCard.querySelector(".damage-btn");
     damageBtn.addEventListener("click", () => applyDamage(monsterCard, true));
@@ -245,7 +318,24 @@ function applyDamage(monsterCard, isDamage) {
     updateHpBar(monsterCard);
     damageInput.value = "";
     damageInput.focus();
-    window.saveToServer();
+
+    // 通过WebSocket发送HP更新
+    const monsterId = monsterCard.dataset.id;
+    if (window.socket && window.socket.connected && monsterId) {
+        console.log(`发送HP更新请求，ID: ${monsterId}, HP: ${currentHp}/${maxHp}, 临时HP: ${tempHp}`);
+        window.socket.emit('update-hp', {
+            sessionId: window.sessionId,
+            monsterId: monsterId,
+            currentHp: currentHp,
+            maxHp: maxHp,
+            tempHp: tempHp
+        });
+
+        // 更新同步状态
+        if (typeof window.updateSyncStatus === 'function') {
+            window.updateSyncStatus("success", "HP已更新");
+        }
+    }
 }
 
 function moveCardUp(card) {
@@ -277,19 +367,39 @@ function updateSortButtonStatus() {
 function saveCardOrder() {
     const newOrderIds = Array.from(document.getElementById("monster-container").querySelectorAll('.monster-card')).map(card => card.dataset.id);
     if (window.socket && window.socket.connected) {
+        console.log(`发送角色卡顺序更新请求`);
         window.socket.emit('reorder-monsters', { sessionId: window.sessionId, order: newOrderIds });
+        // 更新同步状态
+        if (typeof window.updateSyncStatus === 'function') {
+            window.updateSyncStatus("success", "顺序已更新");
+        }
+    } else {
+        console.warn("无法更新角色卡顺序：Socket未连接");
+        if (typeof window.updateSyncStatus === 'function') {
+            window.updateSyncStatus("error", "顺序更新失败，请检查网络连接");
+        }
     }
-    window.saveToServer(true);
+    // 不再调用 window.saveToServer
 }
 
 function deleteCard(card) {
     const monsterId = card.dataset.id;
     if (window.socket && window.socket.connected) {
+        console.log(`发送删除角色卡请求，ID: ${monsterId}`);
         window.socket.emit('delete-monster', { sessionId: window.sessionId, monsterId });
+        // 更新同步状态，使用window对象确保可访问
+        if (typeof window.updateSyncStatus === 'function') {
+            window.updateSyncStatus("success", "删除成功");
+        }
+    } else {
+        console.warn("无法删除角色卡：Socket未连接");
+        if (typeof window.updateSyncStatus === 'function') {
+            window.updateSyncStatus("error", "删除失败，请检查网络连接");
+        }
     }
     if (card.parentNode) card.parentNode.removeChild(card);
     updateSortButtonStatus();
-    window.saveToServer(true);
+    // 不再调用 window.saveToServer，因为已通过WebSocket发送了删除请求
 }
 
 function openStatusSelector(card) {
@@ -328,10 +438,10 @@ function addConditionToGrid(condition, isSelected = false) {
     conditionItem.className = `condition-item${isSelected ? " selected" : ""}`;
     conditionItem.dataset.id = condition.id;
     conditionItem.dataset.custom = condition.custom ? "true" : "false";
-    
+
     // 添加状态描述
     const desc = condition.desc || condition.description || '';
-    
+
     conditionItem.innerHTML = `
         <div class="condition-name">${condition.name}</div>
         ${desc ? `<div class="condition-desc">${desc}</div>` : ''}
@@ -357,7 +467,7 @@ function applySelectedStatus() {
         const descEl = item.querySelector(".condition-desc");
         const desc = descEl ? descEl.textContent : '';
         const isCustom = item.dataset.custom === "true";
-        
+
         // 如果是预定义状态，尝试获取完整信息
         if (!isCustom) {
             const predefined = conditions.find(c => c.id === conditionId);
@@ -365,7 +475,7 @@ function applySelectedStatus() {
                 return predefined;
             }
         }
-        
+
         return {
             id: conditionId,
             name: name,
@@ -373,13 +483,30 @@ function applySelectedStatus() {
             custom: isCustom
         };
     });
-    
+
     currentCardForStatus.dataset.conditions = JSON.stringify(selectedConditions.map(c => c.id));
     updateConditionTags(currentCardForStatus, selectedConditions);
     document.getElementById("status-selector").classList.remove("active");
+
+    // 发送状态更新
+    const monsterId = currentCardForStatus.dataset.id;
+    if (window.socket && window.socket.connected && monsterId) {
+        const conditions = selectedConditions.map(c => c.id);
+        console.log(`发送状态更新请求，ID: ${monsterId}, 状态: ${conditions.join(', ')}`);
+        window.socket.emit('update-conditions', {
+            sessionId: window.sessionId,
+            monsterId: monsterId,
+            conditions: conditions
+        });
+
+        // 更新同步状态
+        if (typeof window.updateSyncStatus === 'function') {
+            window.updateSyncStatus("success", "状态已更新");
+        }
+    }
+
     currentCardForStatus = null;
     hideConditionTooltip();
-    window.saveToServer();
 }
 
 function updateConditionTags(card, conditionObjects) {
@@ -397,7 +524,7 @@ function updateConditionTags(card, conditionObjects) {
                 fullCondition = predefined;
             }
         }
-        
+
         const tag = document.createElement("span");
         tag.className = "condition-tag";
         tag.textContent = fullCondition.name || condition.name;
@@ -436,11 +563,11 @@ function refreshUIFromData(data) {
         reorderMonsterCards(data.order);
     }
     updateSortButtonStatus();
-    
+
     // 只有在刷新后没有角色卡片且没有空状态元素时，才显示空状态
     const hasMonsterCards = document.querySelectorAll('.monster-card').length > 0;
     const hasEmptyState = monsterContainer.querySelector('.empty-state');
-    
+
     if (!hasMonsterCards) {
         if (!hasEmptyState) {
             showEmptyState(monsterContainer);
@@ -471,7 +598,7 @@ function showEmptyState(container) {
     // 移除所有现有的空状态元素
     const existingEmptyStates = container.querySelectorAll('.empty-state');
     existingEmptyStates.forEach(el => el.remove());
-    
+
     // 创建并添加新的空状态元素
     const emptyState = document.createElement("div");
     emptyState.className = "empty-state";

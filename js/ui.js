@@ -58,15 +58,23 @@ function hideConditionTooltip() {
 
 function updateSyncStatus(state, message) {
     const syncStatus = document.getElementById("sync-status");
+    if (!syncStatus) return;
+
     syncStatus.className = "show";
     if (state === "syncing") syncStatus.classList.add("syncing");
     else if (state === "success") syncStatus.classList.add("success");
     else if (state === "error") syncStatus.classList.add("error");
-    syncStatus.querySelector(".sync-text").textContent = message;
+
+    const syncText = syncStatus.querySelector(".sync-text");
+    if (syncText) syncText.textContent = message;
+
     if (state === "success") {
         setTimeout(() => syncStatus.classList.remove("show"), 2000);
     }
 }
+
+// 将函数添加到全局空间
+ window.updateSyncStatus = updateSyncStatus;
 
 function showLoadingState(message = "正在加载战斗数据...") {
     hideLoadingState();
@@ -146,7 +154,7 @@ function showEmptyState(container) {
     // 移除所有现有的空状态元素
     const existingEmptyStates = container.querySelectorAll('.empty-state');
     existingEmptyStates.forEach(el => el.remove());
-    
+
     // 创建并添加新的空状态元素
     const emptyState = document.createElement("div");
     emptyState.className = "empty-state";
