@@ -110,9 +110,9 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             updateSortButtonStatus();
-        } else {
-            console.warn(`找不到要删除的怪物卡片，ID: ${id}`);
         }
+        // 不输出警告，因为在某些情况下找不到卡片是正常的
+        // 例如：当服务器和客户端状态不同步时，或者当多个客户端同时删除同一张卡片时
     }
     // --- 结束添加 ---
 
