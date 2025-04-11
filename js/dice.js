@@ -167,10 +167,8 @@ function setupDiceEvents(socket, sessionId, playerName, saveDiceToServer) {
             const newValue = Math.max(0, Math.min(99, oldValue + change));
             if (newValue !== oldValue) {
                 display.textContent = newValue;
-                if (globalSaveDiceToServer) {
-                    console.log("Dice quantity changed, calling globalSaveDiceToServer (WebSocket sync)");
-                    globalSaveDiceToServer();
-                }
+                // 移除骰子选择同步功能
+                // 不再调用 globalSaveDiceToServer
             }
         }
         plusBtn.addEventListener("click", () => updateQuantity(1));
@@ -182,19 +180,15 @@ function setupDiceEvents(socket, sessionId, playerName, saveDiceToServer) {
         if (globalAdvantage.checked) {
             globalDisadvantage.checked = false;
         }
-        if (globalSaveDiceToServer) {
-             console.log("Advantage changed, calling globalSaveDiceToServer (WebSocket sync)");
-            globalSaveDiceToServer();
-        }
+        // 移除优势选项同步功能
+        // 不再调用 globalSaveDiceToServer
     });
     globalDisadvantage.addEventListener("change", () => {
         if (globalDisadvantage.checked) {
             globalAdvantage.checked = false;
         }
-        if (globalSaveDiceToServer) {
-             console.log("Disadvantage changed, calling globalSaveDiceToServer (WebSocket sync)");
-             globalSaveDiceToServer();
-        }
+        // 移除劣势选项同步功能
+        // 不再调用 globalSaveDiceToServer
     });
     rollButton.addEventListener("click", () => {
         progressBar.style.width = "0%";
@@ -233,7 +227,7 @@ function setupDiceEvents(socket, sessionId, playerName, saveDiceToServer) {
             return;
         }
 
-        const duration = 500;
+        const duration = 2000; // 增加进度条持续时间从500ms到2000ms
         const startTime = performance.now();
 
         function animate() {

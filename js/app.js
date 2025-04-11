@@ -187,7 +187,8 @@ document.addEventListener("DOMContentLoaded", () => {
         socket.on('dice-state-updated', (diceState) => {
             if (!isLoadingData) {
                 console.log("收到骰子状态更新:", diceState);
-                updateDiceUIFromData(diceState);
+                // 不再更新UI，使骰子选择不同步
+                // updateDiceUIFromData(diceState);
             }
         });
         socket.on('dice-rolled', (rollData) => {
@@ -342,10 +343,11 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     function loadDiceFromServer() {
          // isLoadingData = true; // 由 WebSocket 处理
-         console.log("请求最新骰子状态 (通过 WebSocket)...");
+         console.log("请求骰子历史记录 (通过 WebSocket)...");
          if (socket && socket.connected) {
-             socket.emit('request-latest-dice-state', { sessionId: window.sessionId });
-             socket.emit('request-latest-roll-history', { sessionId: window.sessionId }); // 同时请求历史记录
+             // 不再请求骰子状态，只请求历史记录
+             // socket.emit('request-latest-dice-state', { sessionId: window.sessionId });
+             socket.emit('request-latest-roll-history', { sessionId: window.sessionId });
          } else {
              console.warn("loadDiceFromServer 调用时 WebSocket 未连接");
          }
@@ -478,7 +480,9 @@ document.addEventListener("DOMContentLoaded", () => {
             if (socket && socket.connected) {
                 console.log("Emitting request-latest-state");
                 socket.emit('request-latest-state', { sessionId: window.sessionId });
-                socket.emit('request-latest-dice-state', { sessionId: window.sessionId });
+                // 不再请求骰子状态，只请求历史记录
+                // socket.emit('request-latest-dice-state', { sessionId: window.sessionId });
+                socket.emit('request-latest-roll-history', { sessionId: window.sessionId });
                 socket.emit('request-latest-battlefield-state', { sessionId: window.sessionId });
             }
 
