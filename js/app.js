@@ -94,6 +94,26 @@ document.addEventListener("DOMContentLoaded", () => {
             initiative: null
         };
     }
+
+    // 根据ID删除怪物卡片
+    function removeMonsterById(id) {
+        const card = document.querySelector(`.monster-card[data-id="${id}"]`);
+        if (card) {
+            console.log(`删除怪物卡片，ID: ${id}`);
+            card.remove();
+
+            // 检查是否需要显示空状态
+            const hasMonsterCards = monsterContainer.querySelectorAll('.monster-card').length > 0;
+            const hasEmptyState = monsterContainer.querySelector('.empty-state');
+            if (!hasMonsterCards && !hasEmptyState) {
+                showEmptyState(monsterContainer);
+            }
+
+            updateSortButtonStatus();
+        } else {
+            console.warn(`找不到要删除的怪物卡片，ID: ${id}`);
+        }
+    }
     // --- 结束添加 ---
 
     function initSocketConnection() {
@@ -150,10 +170,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
             }
         });
-        socket.on('delete-monster', (data) => {
-            if (data && data.monsterId) {
-                console.log("收到怪物删除通知:", data.monsterId);
-                removeMonsterById(data.monsterId);
+        socket.on('monsters-deleted', (data) => {
+            if (data && data.monsterIds && Array.isArray(data.monsterIds)) {
+                console.log("收到怪物删除通知:", data.monsterIds);
+                data.monsterIds.forEach(monsterId => {
+                    removeMonsterById(monsterId);
+                });
             }
         });
         socket.on('monsters-reordered', (data) => {
